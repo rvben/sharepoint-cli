@@ -56,9 +56,14 @@ jobs:
         shell: bash
         run: |
           uv venv "${RUNNER_TEMP}/build-venv"
-          VENV_BIN="${RUNNER_TEMP}/build-venv/bin"
-          [ -d "$VENV_BIN" ] || VENV_BIN="${RUNNER_TEMP}/build-venv/Scripts"
-          uv pip install --python "$VENV_BIN/python" maturin ziglang
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            VENV_BIN="${RUNNER_TEMP}/build-venv/Scripts"
+            PYTHON="${VENV_BIN}/python.exe"
+          else
+            VENV_BIN="${RUNNER_TEMP}/build-venv/bin"
+            PYTHON="${VENV_BIN}/python"
+          fi
+          uv pip install --python "$PYTHON" maturin ziglang
           echo "$VENV_BIN" >> "$GITHUB_PATH"
 
       - name: Build wheel and binary
