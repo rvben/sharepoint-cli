@@ -171,6 +171,7 @@ fn extract_graph_error_message(body: &str) -> Option<String> {
 
 pub mod download;
 pub mod drives;
+pub mod search;
 pub mod sites;
 
 #[cfg(test)]
