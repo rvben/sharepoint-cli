@@ -151,7 +151,7 @@ async fn ls(
         } else {
             let name_w = terminal_width().saturating_sub(40).max(20);
             rt.out.print_data(&format!(
-                "{:<name_w$}  {:<8}  {:>12}  {}",
+                "{:<name_w$}  {:<6}  {:>10}  {:<16}",
                 "NAME", "KIND", "SIZE", "MODIFIED"
             ));
             for it in &items {
@@ -160,10 +160,15 @@ async fn ls(
                 } else {
                     "file"
                 };
-                let modified = it.modified.as_deref().unwrap_or("-");
+                let modified = it.modified.as_deref().unwrap_or("");
+                let modified_short = modified
+                    .replace('T', " ")
+                    .chars()
+                    .take(16)
+                    .collect::<String>();
                 rt.out.print_data(&format!(
-                    "{:<name_w$}  {:<8}  {:>12}  {}",
-                    it.name, kind, it.size, modified
+                    "{:<name_w$}  {:<6}  {:>10}  {:<16}",
+                    it.name, kind, it.size, modified_short
                 ));
             }
             rt.out.print_message(&format!("({} item(s))", items.len()));
@@ -172,13 +177,24 @@ async fn ls(
     }
 
     // Paginated single-level listing.
-    let res = drives::list_children(&graph, &r.drive.id, &r.parsed.path, page).await?;
-    let mut items = res.items;
-    let next_token = res.next;
-
-    if !all && items.len() > limit {
-        items.truncate(limit);
+    let mut items: Vec<_> = Vec::new();
+    let mut next = page.map(str::to_owned);
+    loop {
+        let pageres =
+            drives::list_children(&graph, &r.drive.id, &r.parsed.path, next.as_deref()).await?;
+        for it in pageres.items {
+            items.push(it);
+            if !all && items.len() >= limit {
+                break;
+            }
+        }
+        if !all || pageres.next.is_none() {
+            next = if all { None } else { pageres.next };
+            break;
+        }
+        next = pageres.next;
     }
+    let next_token = next;
 
     if rt.out.json {
         let json_items: Vec<_> = items
@@ -193,7 +209,7 @@ async fn ls(
     } else {
         let name_w = terminal_width().saturating_sub(40).max(20);
         rt.out.print_data(&format!(
-            "{:<name_w$}  {:<8}  {:>12}  {}",
+            "{:<name_w$}  {:<6}  {:>10}  {:<16}",
             "NAME", "KIND", "SIZE", "MODIFIED"
         ));
         for it in &items {
@@ -202,10 +218,15 @@ async fn ls(
             } else {
                 "file"
             };
-            let modified = it.modified.as_deref().unwrap_or("-");
+            let modified = it.modified.as_deref().unwrap_or("");
+            let modified_short = modified
+                .replace('T', " ")
+                .chars()
+                .take(16)
+                .collect::<String>();
             rt.out.print_data(&format!(
-                "{:<name_w$}  {:<8}  {:>12}  {}",
-                it.name, kind, it.size, modified
+                "{:<name_w$}  {:<6}  {:>10}  {:<16}",
+                it.name, kind, it.size, modified_short
             ));
         }
         rt.out.print_message(&format!("({} item(s))", items.len()));
@@ -281,11 +302,17 @@ async fn download(
         .await
         .map_err(|e| CliError::Other(format!("create '{target}': {e}")))?;
 
-    let bytes =
+    let n =
         crate::graph::download::download_to_writer(&graph, &r.drive.id, &r.parsed.path, &mut file)
             .await?;
     rt.out
-        .print_message(&format!("{bytes} bytes written to '{target}'"));
+        .print_message(&format!("Downloaded {n} byte(s) to {}", path.display()));
+    if rt.out.json {
+        rt.out.print_json(&serde_json::json!({
+            "path": path.display().to_string(),
+            "bytes": n,
+        }));
+    }
     Ok(())
 }
 
@@ -324,10 +351,11 @@ async fn find(
             "items": json_items,
         }));
     } else {
+        let total = items.len();
         for it in &items {
             rt.out.print_data(&it.name);
         }
-        rt.out.print_message(&format!("({} item(s))", items.len()));
+        rt.out.print_message(&format!("({total} match(es))"));
     }
     Ok(())
 }
