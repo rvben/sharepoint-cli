@@ -26,14 +26,14 @@ pub struct CacheEntry {
     pub account: Account,
     pub access_token: String,
     pub access_token_expires_at: DateTime<Utc>,
-    pub refresh_token: String,
+    pub refresh_token: Option<String>,
     pub scopes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Account {
     pub username: String,
-    pub name: String,
+    pub name: Option<String>,
     pub tenant_id: String,
     pub oid: String,
 }
@@ -127,13 +127,13 @@ mod tests {
         CacheEntry {
             account: Account {
                 username: "alice@contoso.com".into(),
-                name: "Alice Example".into(),
+                name: Some("Alice Example".to_string()),
                 tenant_id: "tid-123".into(),
                 oid: "oid-456".into(),
             },
             access_token: "AT".into(),
             access_token_expires_at: Utc::now() + Duration::minutes(60),
-            refresh_token: "RT".into(),
+            refresh_token: Some("RT".to_string()),
             scopes: vec!["openid".into(), "User.Read".into()],
         }
     }
@@ -160,7 +160,7 @@ mod tests {
         let loaded = load(&path).unwrap();
         let e = loaded.entries.get("k1").unwrap();
         assert_eq!(e.account.username, "alice@contoso.com");
-        assert_eq!(e.refresh_token, "RT");
+        assert_eq!(e.refresh_token.as_deref(), Some("RT"));
     }
 
     #[cfg(unix)]
@@ -188,12 +188,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("tokens.json");
         let mut e1 = sample_entry();
-        e1.refresh_token = "RT-old".into();
+        e1.refresh_token = Some("RT-old".to_string());
         upsert(&path, "k1", e1).unwrap();
         let mut e2 = sample_entry();
-        e2.refresh_token = "RT-new".into();
+        e2.refresh_token = Some("RT-new".to_string());
         upsert(&path, "k1", e2).unwrap();
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.entries.get("k1").unwrap().refresh_token, "RT-new");
+        assert_eq!(
+            loaded.entries.get("k1").unwrap().refresh_token.as_deref(),
+            Some("RT-new")
+        );
     }
 }
