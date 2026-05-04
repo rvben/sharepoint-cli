@@ -32,7 +32,7 @@ jobs:
             os: ubuntu-latest
             maturin_args: --compatibility manylinux_2_28 --zig
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-latest
             maturin_args: ""
           - target: aarch64-apple-darwin
             os: macos-latest
