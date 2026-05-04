@@ -169,6 +169,5 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Publish to PyPI
         env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: uv tool run twine upload artifacts/wheels/**/*.whl artifacts/sdist/*.tar.gz
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: uv publish artifacts/wheels/wheel-*/*.whl artifacts/sdist/*.tar.gz
