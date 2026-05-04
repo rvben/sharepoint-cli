@@ -18,6 +18,8 @@ pub async fn run(rt: &Runtime) -> Result<()> {
             "init is interactive and cannot run with --quiet".into(),
         ));
     }
+    // `read_only` does not gate init: init bootstraps the config file from
+    // scratch, and would have nothing to protect if the file does not exist.
     let stdin = std::io::stdin();
     let mut lines = stdin.lock().lines();
 

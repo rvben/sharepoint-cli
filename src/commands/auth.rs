@@ -15,6 +15,8 @@ pub async fn run(rt: &Runtime, cmd: AuthCmd) -> Result<()> {
 }
 
 async fn login(rt: &Runtime) -> Result<()> {
+    // `read_only` does not gate login: it only protects against config-file
+    // writes; the token cache is operational state needed for any read.
     let tenant = rt.cfg.tenant_id.clone().ok_or_else(|| {
         CliError::Input(
             "no tenant configured; run `sharepoint init` or pass --tenant <domain-or-guid>".into(),
