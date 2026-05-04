@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 
+
+## [0.0.3](https://github.com/rvben/sharepoint-cli/compare/v0.0.2...v0.0.3) - 2026-05-04
+
+### Fixed
+
+- **release**: use uv publish instead of twine for PyPI ([b679f57](https://github.com/rvben/sharepoint-cli/commit/b679f57d44ce793ef766f7e8b9472a055225682a))
+
 ## [0.0.2](https://github.com/rvben/sharepoint-cli/compare/v0.0.1...v0.0.2) - 2026-05-04
 
 ### Added
