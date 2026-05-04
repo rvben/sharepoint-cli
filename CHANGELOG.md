@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+
+## [0.0.2](https://github.com/rvben/sharepoint-cli/compare/v0.0.1...v0.0.2) - 2026-05-04
+
+### Added
+
+- **release**: add maturin/PyPI scaffolding and release workflow ([020f4fa](https://github.com/rvben/sharepoint-cli/commit/020f4fa1861056ad76b7a118610b7ca4fde71eec))
+
 ## [0.0.1] - 2026-05-04
 
 ### Added
