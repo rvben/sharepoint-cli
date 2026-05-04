@@ -2,6 +2,7 @@
 
 use assert_cmd::Command;
 use chrono::{Duration, Utc};
+use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
 use sharepoint_cli::auth::token_cache::{Account, CacheEntry, cache_key, upsert};
 use wiremock::matchers::{method, path};
