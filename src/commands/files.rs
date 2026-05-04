@@ -1,11 +1,7 @@
 //! `sharepoint files ls | stat | download | find`
 
-use std::io::Write as _;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
 use tokio::fs::File;
-use tokio::io::{AsyncWrite, AsyncWriteExt as _};
+use tokio::io::AsyncWriteExt as _;
 
 use crate::auth::AuthContext;
 use crate::cli::{FilesCmd, Runtime};
@@ -15,34 +11,6 @@ use crate::graph::sites::Site;
 use crate::graph::{GraphClient, drives, search};
 use crate::output::terminal_width;
 use crate::reference::{ParsedRef, parse};
-
-/// Synchronous-stdout adapter: wraps `std::io::Stdout` to satisfy `AsyncWrite`.
-///
-/// This is safe for the download-to-stdout path because stdout writes are
-/// inherently blocking (no async kernel interface on most platforms). Each
-/// `poll_write` call acquires the global stdout lock, writes synchronously, and
-/// returns `Poll::Ready`. This matches the behaviour of Tokio's built-in
-/// `tokio::io::stdout()` (which is only available when the `io-std` feature is
-/// enabled, and that feature is not in our dependency tree).
-struct StdoutWriter(std::io::Stdout);
-
-impl AsyncWrite for StdoutWriter {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        Poll::Ready(self.get_mut().0.write(buf))
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Poll::Ready(self.get_mut().0.flush())
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-}
 
 /// Resolved reference: everything the sub-commands need to call Graph.
 struct Resolved {
@@ -269,7 +237,7 @@ async fn download(
     };
 
     if target == "-" {
-        let mut stdout = StdoutWriter(std::io::stdout());
+        let mut stdout = tokio::io::stdout();
         let bytes = crate::graph::download::download_to_writer(
             &graph,
             &r.drive.id,
