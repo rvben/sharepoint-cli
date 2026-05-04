@@ -5,6 +5,11 @@
 //!  2. SiteRef::Name     → check profile aliases first, then `/sites?search=`.
 //!  3. SiteRef::Default  → use ResolvedConfig.default_site, recurse.
 
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
+
+use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::Deserialize;
 
 use super::GraphClient;
@@ -42,7 +47,11 @@ pub async fn list(
     page_token: Option<&str>,
 ) -> Result<SiteListResult> {
     let (path, source) = match (query, page_token) {
-        (_, Some(token)) => (decode_page_token(token)?, SiteListSource::Search),
+        (_, Some(token)) => {
+            let decoded = decode_page_token(token)?;
+            let source = source_for_path(&decoded);
+            (decoded, source)
+        }
         (None, None) => ("/me/followedSites".to_string(), SiteListSource::Followed),
         (Some(q), None) => (
             format!("/sites?search={}", urlencoding(q)),
@@ -73,7 +82,7 @@ pub async fn get_by_url(graph: &GraphClient, url: &str) -> Result<Site> {
 pub async fn resolve(
     graph: &GraphClient,
     site_ref: &SiteRef,
-    aliases: &std::collections::BTreeMap<String, String>,
+    aliases: &BTreeMap<String, String>,
     default_site: Option<&str>,
 ) -> Result<Site> {
     match site_ref {
@@ -119,23 +128,30 @@ fn urlencoding(input: &str) -> String {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
                 out.push(b as char)
             }
-            _ => out.push_str(&format!("%{b:02X}")),
+            _ => write!(out, "%{b:02X}").unwrap(),
         }
     }
     out
 }
 
 fn encode_page_token(next_link: &str) -> String {
-    use base64::Engine;
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(next_link.as_bytes())
+    URL_SAFE_NO_PAD.encode(next_link.as_bytes())
 }
 
 fn decode_page_token(token: &str) -> Result<String> {
-    use base64::Engine;
-    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+    let bytes = URL_SAFE_NO_PAD
         .decode(token.as_bytes())
         .map_err(|e| CliError::Input(format!("invalid --page token: {e}")))?;
     String::from_utf8(bytes).map_err(|e| CliError::Input(format!("invalid --page token: {e}")))
+}
+
+/// Derive the list source from a decoded page-token path.
+fn source_for_path(path: &str) -> SiteListSource {
+    if path.contains("/me/followedSites") {
+        SiteListSource::Followed
+    } else {
+        SiteListSource::Search
+    }
 }
 
 #[cfg(test)]
@@ -158,5 +174,16 @@ mod tests {
     #[test]
     fn url_encoding_preserves_unreserved() {
         assert_eq!(urlencoding("a.b-c_d~e"), "a.b-c_d~e");
+    }
+
+    #[test]
+    fn source_for_path_followed_sites() {
+        // A page token from a followed-sites continuation must resolve to Followed.
+        let path = "/me/followedSites?$skiptoken=XYZ";
+        assert!(matches!(source_for_path(path), SiteListSource::Followed));
+
+        // A page token from a search continuation must resolve to Search.
+        let path = "/sites?search=intranet&$skiptoken=ABC";
+        assert!(matches!(source_for_path(path), SiteListSource::Search));
     }
 }
