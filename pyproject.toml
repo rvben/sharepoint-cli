@@ -3,7 +3,7 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "sharepoint-cli"
+name = "sharepoint-cli-rs"
 dynamic = ["version"]
 description = "Agent-friendly SharePoint Online CLI with JSON output, structured exit codes, and schema introspection"
 readme = "README.md"

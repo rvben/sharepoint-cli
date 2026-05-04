@@ -2,7 +2,7 @@
 
 try:
     from importlib.metadata import version
-    __version__ = version("sharepoint-cli")
+    __version__ = version("sharepoint-cli-rs")
 except ImportError:
     from importlib_metadata import version
-    __version__ = version("sharepoint-cli")
+    __version__ = version("sharepoint-cli-rs")

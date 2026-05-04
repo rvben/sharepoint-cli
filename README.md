@@ -13,9 +13,9 @@ cargo install sharepoint-cli
 ### From PyPI
 
 ```sh
-pip install sharepoint-cli
+pip install sharepoint-cli-rs
 # or
-uv tool install sharepoint-cli
+uv tool install sharepoint-cli-rs
 ```
 
 ### From source
