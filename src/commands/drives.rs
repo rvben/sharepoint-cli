@@ -2,7 +2,7 @@
 
 use crate::auth::AuthContext;
 use crate::cli::{DrivesCmd, Runtime};
-use crate::error::Result;
+use crate::error::{CliError, Result};
 use crate::graph::{GraphClient, drives, sites};
 use crate::reference::SiteRef;
 
@@ -16,11 +16,23 @@ async fn list(rt: &Runtime, site_input: &str, limit: usize, all: bool) -> Result
     let auth = AuthContext::new(rt.cfg.clone(), rt.cache_path.clone());
     let graph = GraphClient::new(auth);
 
-    // The site argument can be a URL, an alias name, or "default".
+    // The site argument can be a URL, an alias name, "default", or spo://Site.
     let site_ref = if site_input == "default" {
         SiteRef::Default
     } else if site_input.starts_with("http://") || site_input.starts_with("https://") {
         SiteRef::Url(site_input.to_string())
+    } else if let Some(rest) = site_input.strip_prefix("spo://") {
+        // Accept bare spo://SiteName (and spo://SiteName/... with trailing segments ignored).
+        let name = rest
+            .split('/')
+            .next()
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                CliError::Input(
+                    "spo:// URI is missing a site name (expected spo://SiteName)".into(),
+                )
+            })?;
+        SiteRef::Name(name.to_string())
     } else {
         SiteRef::Name(site_input.to_string())
     };
