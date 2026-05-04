@@ -169,6 +169,8 @@ fn extract_graph_error_message(body: &str) -> Option<String> {
     })
 }
 
+pub mod sites;
+
 #[cfg(test)]
 mod tests {
     use super::*;
