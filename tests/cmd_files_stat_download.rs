@@ -51,6 +51,7 @@ async fn baseline_mocks(server: &MockServer) {
 async fn files_stat_includes_download_url() {
     let server = MockServer::start().await;
     baseline_mocks(&server).await;
+    // wiremock's path() matcher ignores the $select query string the binary sends.
     Mock::given(method("GET"))
         .and(path("/drives/D1/root:/Q4-plan.pptx"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
@@ -82,6 +83,7 @@ async fn files_stat_includes_download_url() {
         .assert()
         .success()
         .stdout(contains("\"download_url\""))
+        .stdout(contains("short.example/download"))
         .stdout(contains("Q4-plan.pptx"));
 }
 
