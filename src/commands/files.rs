@@ -325,33 +325,44 @@ async fn find(
     all: bool,
     page: Option<&str>,
 ) -> Result<()> {
-    let q = query.unwrap_or("*");
     let (graph, r) = resolve(rt, reference).await?;
+    // Permissive default query when only --name is given (Graph requires a query).
+    let q = query.unwrap_or("*");
 
-    let res = search::search(&graph, &r.drive.id, q, page).await?;
-    let mut items = res.items;
-    let next_token = res.next;
-
-    // Apply glob filter before limit truncation so the user gets `limit` matching items.
-    if let Some(glob) = name_glob {
-        items.retain(|it| search::glob_matches(glob, &it.name));
+    let mut items = Vec::new();
+    let mut next: Option<String> = page.map(String::from);
+    loop {
+        let res = search::search(&graph, &r.drive.id, q, next.as_deref()).await?;
+        for it in res.items {
+            if let Some(g) = name_glob
+                && !search::glob_matches(g, &it.name)
+            {
+                continue;
+            }
+            items.push(it);
+            if !all && items.len() >= limit {
+                break;
+            }
+        }
+        if !all || res.next.is_none() {
+            next = if all { None } else { res.next };
+            break;
+        }
+        next = res.next;
     }
-    if !all && items.len() > limit {
-        items.truncate(limit);
-    }
 
+    let total = items.len();
     if rt.out.json {
         let json_items: Vec<_> = items
             .iter()
             .map(|it| canonical_json(it, &r.site, &r.drive, false))
             .collect();
         rt.out.print_json(&serde_json::json!({
-            "total": json_items.len(),
-            "next": next_token,
+            "total": total,
+            "next": next,
             "items": json_items,
         }));
     } else {
-        let total = items.len();
         for it in &items {
             rt.out.print_data(&it.name);
         }
