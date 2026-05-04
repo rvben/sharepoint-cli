@@ -3,7 +3,7 @@
 use crate::auth::AuthContext;
 use crate::cli::{Runtime, SitesCmd};
 use crate::config;
-use crate::error::Result;
+use crate::error::{CliError, Result};
 use crate::graph::{GraphClient, sites};
 
 pub async fn run(rt: &Runtime, cmd: SitesCmd) -> Result<()> {
@@ -80,6 +80,11 @@ async fn list(
 }
 
 async fn use_site(rt: &Runtime, value: &str) -> Result<()> {
+    if rt.cfg.read_only {
+        return Err(CliError::ReadOnly(
+            "sites use modifies the config file; not allowed in read-only mode".into(),
+        ));
+    }
     let mut file = rt.config_file.clone();
     let entry = file.profile.entry(rt.cfg.profile_name.clone()).or_default();
     entry.default_site = Some(value.to_string());
