@@ -8,12 +8,14 @@
 //! - 400 authorization_declined / expired_token / access_denied → terminal failure
 //! - any other 4xx/5xx → terminal failure with body in message
 //!
-//! Total wait capped by `expires_in` from the device-code response.
+//! Polling budget tracks scheduled sleep time only; real wall clock can exceed
+//! `expires_in` if requests are slow. The server's `expired_token` response is
+//! the authoritative cap.
 
 use std::time::Duration;
 
 use base64::Engine;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tokio::time::sleep;
 
 use crate::error::{CliError, Result};
@@ -140,13 +142,9 @@ pub async fn poll_for_token(
         let parsed: std::result::Result<RawTokenError, _> = serde_json::from_str(&body);
         match parsed {
             Ok(err) => match err.error.as_str() {
-                "authorization_pending" | "bad_verification_code" => {
-                    // keep polling at same interval
-                    continue;
-                }
+                "authorization_pending" | "bad_verification_code" => {}
                 "slow_down" => {
                     interval = interval.saturating_add(5);
-                    continue;
                 }
                 "authorization_declined" => {
                     return Err(CliError::Auth("user declined the sign-in request".into()));
@@ -249,7 +247,6 @@ pub fn decode_id_token(id_token: &str) -> Result<IdClaims> {
         .ok_or_else(|| CliError::Auth("id_token has no payload segment".into()))?;
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(mid)
-        .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(mid))
         .map_err(|e| CliError::Auth(format!("id_token base64 decode: {e}")))?;
     let json: serde_json::Value = serde_json::from_slice(&bytes)
         .map_err(|e| CliError::Auth(format!("id_token JSON decode: {e}")))?;
@@ -286,12 +283,6 @@ pub fn default_scope(read_only: bool) -> &'static str {
     } else {
         "openid profile offline_access User.Read Files.ReadWrite.All Sites.Read.All"
     }
-}
-
-#[derive(Debug, Serialize)]
-pub struct PromptInfo {
-    pub user_code: String,
-    pub verification_uri: String,
 }
 
 #[cfg(test)]
