@@ -48,11 +48,13 @@ impl AuthContext {
         }
     }
 
-    pub fn client_id(&self) -> String {
-        let inner = self.inner.try_lock();
-        inner
-            .ok()
-            .and_then(|g| g.cfg.client_id.clone())
+    pub async fn client_id(&self) -> String {
+        self.inner
+            .lock()
+            .await
+            .cfg
+            .client_id
+            .clone()
             .unwrap_or_else(|| DEFAULT_CLIENT_ID.to_string())
     }
 
@@ -110,15 +112,16 @@ impl AuthContext {
         )
         .await?;
 
+        let access_token = resp.access_token;
         let new_entry = token_cache::CacheEntry {
             account: entry.account.clone(),
-            access_token: resp.access_token.clone(),
+            access_token: access_token.clone(),
             access_token_expires_at: Utc::now() + Duration::seconds(resp.expires_in as i64),
             refresh_token: Some(resp.refresh_token),
             scopes: resp.scope.split(' ').map(String::from).collect(),
         };
         token_cache::upsert(&guard.cache_path, &key, new_entry)?;
-        Ok(resp.access_token)
+        Ok(access_token)
     }
 
     pub async fn http(&self) -> reqwest::Client {
