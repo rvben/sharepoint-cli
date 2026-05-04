@@ -1,5 +1,7 @@
 //! Drive (document library) lookup, item listing, and canonical-shape mapping.
 
+use std::fmt::Write as _;
+
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::Deserialize;
@@ -104,7 +106,8 @@ pub async fn get_item(graph: &GraphClient, drive_id: &str, path: &str) -> Result
         format!("/drives/{drive_id}/root")
     } else {
         let trimmed = path.trim_start_matches('/');
-        format!("/drives/{drive_id}/root:/{trimmed}")
+        let encoded = encode_path_segments(trimmed);
+        format!("/drives/{drive_id}/root:/{encoded}")
     };
     graph.get_json(&api).await
 }
@@ -119,7 +122,8 @@ pub async fn get_item_with_download_url(
         format!("/drives/{drive_id}/root")
     } else {
         let trimmed = path.trim_start_matches('/');
-        format!("/drives/{drive_id}/root:/{trimmed}")
+        let encoded = encode_path_segments(trimmed);
+        format!("/drives/{drive_id}/root:/{encoded}")
     };
     let select = "id,name,size,eTag,webUrl,createdDateTime,lastModifiedDateTime,parentReference,folder,file,@microsoft.graph.downloadUrl";
     let api = format!("{api_base}?$select={select}");
@@ -144,7 +148,8 @@ pub async fn list_children(
                 format!("/drives/{drive_id}/root/children")
             } else {
                 let trimmed = path.trim_start_matches('/');
-                format!("/drives/{drive_id}/root:/{trimmed}:/children")
+                let encoded = encode_path_segments(trimmed);
+                format!("/drives/{drive_id}/root:/{encoded}:/children")
             }
         }
     };
@@ -203,6 +208,7 @@ pub fn canonical_json(
         "file"
     };
     let path = derive_full_path(item);
+
     let mut hash = serde_json::Map::new();
     if let Some(file) = &item.file {
         if let Some(qx) = &file.hashes.quick_xor {
@@ -212,39 +218,41 @@ pub fn canonical_json(
             hash.insert("sha1".into(), serde_json::Value::String(s.clone()));
         }
     }
-    let mut value = serde_json::json!({
-        "id": item.id,
-        "name": item.name,
-        "path": path,
-        "site": {
+
+    let mut map = serde_json::Map::new();
+    map.insert("id".into(), serde_json::Value::String(item.id.clone()));
+    map.insert("name".into(), serde_json::Value::String(item.name.clone()));
+    map.insert("path".into(), serde_json::Value::String(path));
+    map.insert(
+        "site".into(),
+        serde_json::json!({
             "id": site.id,
             "name": site.display_name,
             "url": site.web_url,
-        },
-        "drive": {
+        }),
+    );
+    map.insert(
+        "drive".into(),
+        serde_json::json!({
             "id": drive.id,
             "name": drive.name,
-        },
-        "kind": kind,
-        "size": item.size,
-        "etag": item.etag,
-        "created": item.created,
-        "modified": item.modified,
-        "web_url": item.web_url,
-    });
+        }),
+    );
+    map.insert("kind".into(), serde_json::Value::String(kind.into()));
+    map.insert("size".into(), serde_json::json!(item.size));
+    map.insert("etag".into(), serde_json::json!(item.etag));
+    map.insert("created".into(), serde_json::json!(item.created));
+    map.insert("modified".into(), serde_json::json!(item.modified));
+    map.insert("web_url".into(), serde_json::json!(item.web_url));
+
     if !hash.is_empty() {
-        value
-            .as_object_mut()
-            .unwrap()
-            .insert("hash".into(), serde_json::Value::Object(hash));
+        map.insert("hash".into(), serde_json::Value::Object(hash));
     }
     if include_download_url && let Some(u) = &item.download_url {
-        value
-            .as_object_mut()
-            .unwrap()
-            .insert("download_url".into(), serde_json::Value::String(u.clone()));
+        map.insert("download_url".into(), serde_json::Value::String(u.clone()));
     }
-    value
+
+    serde_json::Value::Object(map)
 }
 
 fn derive_full_path(item: &DriveItem) -> String {
@@ -260,6 +268,28 @@ fn derive_full_path(item: &DriveItem) -> String {
     } else {
         format!("/{}/{}", suffix, item.name)
     }
+}
+
+/// Percent-encodes each path segment using the RFC 3986 unreserved character
+/// set, preserving `/` separators so the full path structure is maintained.
+fn encode_path_segments(path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    let mut first = true;
+    for seg in path.split('/') {
+        if !first {
+            out.push('/');
+        }
+        first = false;
+        for b in seg.bytes() {
+            match b {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                    out.push(b as char)
+                }
+                _ => write!(out, "%{b:02X}").unwrap(),
+            }
+        }
+    }
+    out
 }
 
 fn encode_page_token(next_link: &str) -> String {
@@ -352,5 +382,15 @@ mod tests {
         assert_eq!(item_path("", "x"), "/x");
         assert_eq!(item_path("/", "x"), "/x");
         assert_eq!(item_path("/A/B", "x"), "/A/B/x");
+    }
+
+    #[test]
+    fn encode_path_segments_handles_spaces_and_keeps_slashes() {
+        assert_eq!(
+            encode_path_segments("Marketing Plans/Q1 2025 Deck.pptx"),
+            "Marketing%20Plans/Q1%202025%20Deck.pptx"
+        );
+        assert_eq!(encode_path_segments(""), "");
+        assert_eq!(encode_path_segments("a/b/c"), "a/b/c");
     }
 }
