@@ -14,11 +14,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{CliError, Result};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenCache {
     pub version: u32,
     #[serde(default)]
     pub entries: BTreeMap<String, CacheEntry>,
+}
+
+impl Default for TokenCache {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            entries: BTreeMap::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,29 +52,27 @@ pub fn cache_key(tenant_id: &str, client_id: &str, oid: &str) -> String {
 }
 
 pub fn load(path: &Path) -> Result<TokenCache> {
-    if !path.exists() {
-        return Ok(TokenCache {
-            version: 1,
-            entries: BTreeMap::new(),
-        });
-    }
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| CliError::Other(format!("read {}: {e}", path.display())))?;
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(TokenCache::default());
+        }
+        Err(e) => {
+            return Err(CliError::Other(format!("read {}: {e}", path.display())));
+        }
+    };
     let cache: TokenCache = serde_json::from_str(&text)
         .map_err(|e| CliError::Other(format!("parse {}: {e}", path.display())))?;
     Ok(cache)
 }
 
 pub fn save(path: &Path, cache: &TokenCache) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| CliError::Other(format!("mkdir {}: {e}", parent.display())))?;
-    }
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(parent)
+        .map_err(|e| CliError::Other(format!("mkdir {}: {e}", parent.display())))?;
     let body = serde_json::to_vec_pretty(cache)
         .map_err(|e| CliError::Other(format!("serialize tokens: {e}")))?;
 
-    // Tempfile + rename for atomicity.
-    let parent = path.parent().unwrap_or(Path::new("."));
     let mut tmp = tempfile::Builder::new()
         .prefix(".tokens-")
         .suffix(".json.tmp")
@@ -102,9 +109,6 @@ fn set_mode_0600(_path: &Path) -> Result<()> {
 pub fn upsert(path: &Path, key: &str, entry: CacheEntry) -> Result<()> {
     let mut cache = load(path)?;
     cache.entries.insert(key.to_string(), entry);
-    if cache.version == 0 {
-        cache.version = 1;
-    }
     save(path, &cache)
 }
 
