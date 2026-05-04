@@ -1,8 +1,9 @@
 //! `sharepoint init` — interactive first-run setup.
 //!
 //! Prompts for tenant + (optional) default site, writes the config file,
-//! then runs the same device-code login as `sharepoint auth login`. v0.1
-//! is device-code only — `--auth client-credentials` is reserved for v0.2.
+//! then runs the same device-code login as `sharepoint auth login`. Only
+//! device-code authentication is supported; client-credential flows are
+//! not yet implemented.
 
 use std::io::{BufRead, Write};
 
@@ -35,9 +36,9 @@ pub async fn run(rt: &Runtime) -> Result<()> {
     let profile_name = rt.cfg.profile_name.clone();
     let mut file = rt.config_file.clone();
     let entry = file.profile.entry(profile_name.clone()).or_default();
-    entry.tenant_id = Some(tenant);
+    entry.tenant_id = Some(tenant.clone());
     if !default_site.is_empty() {
-        entry.default_site = Some(default_site);
+        entry.default_site = Some(default_site.clone());
     }
     config::save_file(&rt.config_path, &file)?;
     rt.out
@@ -45,14 +46,14 @@ pub async fn run(rt: &Runtime) -> Result<()> {
 
     // Re-build runtime so the new config is loaded for the auth-login call.
     let mut updated = rt.cfg.clone();
-    updated.tenant_id = file
-        .profile
-        .get(&profile_name)
-        .and_then(|p| p.tenant_id.clone());
-    updated.default_site = file
-        .profile
-        .get(&profile_name)
-        .and_then(|p| p.default_site.clone());
+    updated.tenant_id = Some(tenant);
+    updated.default_site = if default_site.is_empty() {
+        file.profile
+            .get(&profile_name)
+            .and_then(|p| p.default_site.clone())
+    } else {
+        Some(default_site)
+    };
     let new_rt = Runtime {
         out: rt.out,
         cfg: updated,
