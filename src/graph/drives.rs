@@ -272,7 +272,7 @@ fn derive_full_path(item: &DriveItem) -> String {
 
 /// Percent-encodes each path segment using the RFC 3986 unreserved character
 /// set, preserving `/` separators so the full path structure is maintained.
-fn encode_path_segments(path: &str) -> String {
+pub(super) fn encode_path_segments(path: &str) -> String {
     let mut out = String::with_capacity(path.len());
     let mut first = true;
     for seg in path.split('/') {
