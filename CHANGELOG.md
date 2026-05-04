@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 
 
+
+## [0.0.4](https://github.com/rvben/sharepoint-cli/compare/v0.0.3...v0.0.4) - 2026-05-04
+
+### Fixed
+
+- **release**: rename PyPI distribution to sharepoint-cli-rs ([b1c17c4](https://github.com/rvben/sharepoint-cli/commit/b1c17c4f719d4c33770aab3c07c7eeab61d39380))
+
 ## [0.0.3](https://github.com/rvben/sharepoint-cli/compare/v0.0.2...v0.0.3) - 2026-05-04
 
 ### Fixed
