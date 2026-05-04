@@ -16,6 +16,9 @@ use crate::error::{CliError, Result};
 
 /// Maximum number of automatic retries on 429 / 5xx.
 const MAX_RETRIES: u32 = 3;
+/// Cap on `Retry-After` header value (seconds) — prevents a hostile or
+/// misconfigured upstream from blocking the CLI for hours.
+const MAX_RETRY_AFTER_SECS: u64 = 60;
 
 #[derive(Clone)]
 pub struct GraphClient {
@@ -99,7 +102,9 @@ impl GraphClient {
             };
 
             if status == StatusCode::TOO_MANY_REQUESTS && attempt < MAX_RETRIES {
-                let secs = retry_after.unwrap_or(2u64.pow(attempt.min(5)));
+                let secs = retry_after
+                    .map(|s| s.min(MAX_RETRY_AFTER_SECS))
+                    .unwrap_or_else(|| 2u64.pow(attempt));
                 sleep(Duration::from_secs(secs)).await;
                 attempt += 1;
                 continue;
@@ -108,7 +113,7 @@ impl GraphClient {
                 && attempt < MAX_RETRIES
                 && matches!(method, Method::GET | Method::HEAD)
             {
-                let secs = 2u64.pow(attempt.min(5));
+                let secs = 2u64.pow(attempt);
                 sleep(Duration::from_secs(secs)).await;
                 attempt += 1;
                 continue;
