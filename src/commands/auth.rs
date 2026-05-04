@@ -115,31 +115,34 @@ async fn logout(rt: &Runtime) -> Result<()> {
 
 async fn status(rt: &Runtime) -> Result<()> {
     let cache = token_cache::load(&rt.cache_path)?;
-    let mut accounts = Vec::new();
-    for (key, entry) in &cache.entries {
-        accounts.push(serde_json::json!({
-            "key": key,
-            "username": entry.account.username,
-            "name": entry.account.name,
-            "tenant_id": entry.account.tenant_id,
-            "oid": entry.account.oid,
-            "expires_at": entry.access_token_expires_at.to_rfc3339(),
-            "scopes": entry.scopes,
-        }));
-    }
     if rt.out.json {
+        let accounts: Vec<_> = cache
+            .entries
+            .iter()
+            .map(|(key, entry)| {
+                serde_json::json!({
+                    "key": key,
+                    "username": entry.account.username,
+                    "name": entry.account.name,
+                    "tenant_id": entry.account.tenant_id,
+                    "oid": entry.account.oid,
+                    "expires_at": entry.access_token_expires_at.to_rfc3339(),
+                    "scopes": entry.scopes,
+                })
+            })
+            .collect();
         rt.out
             .print_json(&serde_json::json!({"accounts": accounts}));
-    } else if accounts.is_empty() {
+    } else if cache.entries.is_empty() {
         rt.out
             .print_message("No cached accounts. Run `sharepoint auth login`.");
     } else {
-        for acc in &accounts {
-            println!(
+        for entry in cache.entries.values() {
+            rt.out.print_data(&format!(
                 "{:30}  expires {}",
-                acc["username"].as_str().unwrap_or(""),
-                acc["expires_at"].as_str().unwrap_or("")
-            );
+                entry.account.username,
+                entry.access_token_expires_at.to_rfc3339()
+            ));
         }
     }
     Ok(())
