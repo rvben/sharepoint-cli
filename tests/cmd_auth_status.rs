@@ -8,7 +8,7 @@ use sharepoint_cli::auth::token_cache::{Account, CacheEntry, cache_key, upsert};
 #[test]
 fn auth_status_prints_cached_account() {
     let dir = tempfile::tempdir().unwrap();
-    let cache_path = dir.path().join("tokens.json");
+    let cache_path = dir.path().join("sharepoint").join("tokens.json");
     let key = cache_key("contoso", "client-1", "OID-1");
     upsert(
         &cache_path,
