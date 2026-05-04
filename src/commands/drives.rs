@@ -8,12 +8,7 @@ use crate::reference::SiteRef;
 
 pub async fn run(rt: &Runtime, cmd: DrivesCmd) -> Result<()> {
     match cmd {
-        DrivesCmd::List {
-            site,
-            limit,
-            all,
-            page: _,
-        } => list(rt, &site, limit, all).await,
+        DrivesCmd::List { site, limit, all } => list(rt, &site, limit, all).await,
     }
 }
 

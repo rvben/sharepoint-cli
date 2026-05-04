@@ -107,8 +107,6 @@ pub enum DrivesCmd {
         limit: usize,
         #[arg(long)]
         all: bool,
-        #[arg(long)]
-        page: Option<String>,
     },
 }
 
