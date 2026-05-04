@@ -1,0 +1,169 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      - run: make fmt-check
+      - run: make lint
+      - run: make test
+
+  build:
+    needs: check
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            maturin_args: --compatibility manylinux_2_28 --zig
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            maturin_args: --compatibility manylinux_2_28 --zig
+          - target: x86_64-apple-darwin
+            os: macos-13
+            maturin_args: ""
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            maturin_args: ""
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            maturin_args: ""
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install maturin and zig
+        shell: bash
+        run: |
+          uv venv "${RUNNER_TEMP}/build-venv"
+          VENV_BIN="${RUNNER_TEMP}/build-venv/bin"
+          [ -d "$VENV_BIN" ] || VENV_BIN="${RUNNER_TEMP}/build-venv/Scripts"
+          uv pip install --python "$VENV_BIN/python" maturin ziglang
+          echo "$VENV_BIN" >> "$GITHUB_PATH"
+
+      - name: Build wheel and binary
+        run: maturin build --release --target ${{ matrix.target }} ${{ matrix.maturin_args }}
+        shell: bash
+
+      - name: Package binary (unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../sharepoint-${{ github.ref_name }}-${{ matrix.target }}.tar.gz sharepoint
+        shell: bash
+
+      - name: Package binary (windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ../../../sharepoint-${{ github.ref_name }}-${{ matrix.target }}.zip sharepoint.exe
+        shell: bash
+
+      - name: Compute SHA256 (unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            shasum -a 256 sharepoint-${{ github.ref_name }}-${{ matrix.target }}.tar.gz > sharepoint-${{ github.ref_name }}-${{ matrix.target }}.tar.gz.sha256
+          else
+            sha256sum sharepoint-${{ github.ref_name }}-${{ matrix.target }}.tar.gz > sharepoint-${{ github.ref_name }}-${{ matrix.target }}.tar.gz.sha256
+          fi
+        shell: bash
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: sharepoint-${{ github.ref_name }}-${{ matrix.target }}.*
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.target }}
+          path: target/wheels/*.whl
+
+  sdist:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install maturin
+        shell: bash
+        run: |
+          uv venv "${RUNNER_TEMP}/build-venv"
+          uv pip install --python "${RUNNER_TEMP}/build-venv/bin/python" maturin
+          echo "${RUNNER_TEMP}/build-venv/bin" >> "$GITHUB_PATH"
+      - run: maturin sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: target/wheels/*.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            sharepoint-*.tar.gz
+            sharepoint-*.tar.gz.sha256
+            sharepoint-*.zip
+
+  publish-crates:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  publish-pypi:
+    needs: [build, sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: artifacts/wheels
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: artifacts/sdist
+      - uses: astral-sh/setup-uv@v6
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: uv tool run twine upload artifacts/wheels/**/*.whl artifacts/sdist/*.tar.gz

@@ -1,4 +1,4 @@
-.PHONY: build release test test-e2e lint fmt check clean install release-patch release-minor release-major
+.PHONY: build release test test-e2e lint fmt fmt-check check clean install release-patch release-minor release-major
 
 build:
 	cargo build
@@ -19,13 +19,15 @@ test-e2e:
 	cargo nextest run --test e2e
 
 lint:
-	cargo fmt -- --check
 	cargo clippy --all-targets -- -D warnings
 
 fmt:
 	cargo fmt
 
-check: lint test
+fmt-check:
+	cargo fmt -- --check
+
+check: fmt-check lint test
 
 clean:
 	cargo clean
