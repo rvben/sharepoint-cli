@@ -7,6 +7,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 
 
+
+## [0.0.5](https://github.com/rvben/sharepoint-cli/compare/v0.0.4...v0.0.5) - 2026-05-06
+
+### Added
+
+- **graph**: accept HTTP-date in Retry-After header ([d0083da](https://github.com/rvben/sharepoint-cli/commit/d0083da415e8c9d9e38e8e0de5851f8719615ee7))
+- **auth**: require client_id and surface a friendly error when missing ([268085f](https://github.com/rvben/sharepoint-cli/commit/268085f2c9af7ed0e9470a3b8928d2d047582975))
+
+### Fixed
+
+- **files**: use Option<usize> for --limit to detect explicit value ([ce4c14e](https://github.com/rvben/sharepoint-cli/commit/ce4c14e1b3cb2f24cf119d5d8f55382a99d577b9))
+- **auth**: use SHAREPOINT_REFRESH_TOKEN to bootstrap auth ([a41e178](https://github.com/rvben/sharepoint-cli/commit/a41e178952a6e4ad94bd61c21f97ca354622060a))
+- **auth**: apply redactor to OAuth2Error.error_description ([1230534](https://github.com/rvben/sharepoint-cli/commit/1230534cf6048f72955cf113089525804184ff0b))
+- **auth**: release mutex across file I/O and network in access_token ([3f00c7a](https://github.com/rvben/sharepoint-cli/commit/3f00c7ab15a87ec2299a53a9e584620d8276eafd))
+- **auth**: always emit device-code prompt under --quiet ([ad3ec75](https://github.com/rvben/sharepoint-cli/commit/ad3ec75a49a815b39e73cab80e1ff40dcd58407e))
+- **auth**: retry transient errors on token endpoint ([1e9c5f5](https://github.com/rvben/sharepoint-cli/commit/1e9c5f58a847b347fe13d680289f0fcbb09b648a))
+- **auth**: redact token-endpoint error bodies ([be11124](https://github.com/rvben/sharepoint-cli/commit/be11124c0d1bf9e039bf6b03145a26bf32c38a2e))
+- **pagination**: cursor preserves mid-page progress ([88b9dab](https://github.com/rvben/sharepoint-cli/commit/88b9dabab8478bf2e3238c0afbb34999267565e0))
+- **drives**: paginate drives list to fetch all pages ([7fd8a53](https://github.com/rvben/sharepoint-cli/commit/7fd8a53ec3816bdb22acc834eebc0a8e60866203))
+- **files**: reject pagination flags when --recursive is set ([d6e7c2f](https://github.com/rvben/sharepoint-cli/commit/d6e7c2f3152e7f65cde51494e4e1f56496debd3e))
+- **graph**: validate page-token host before attaching bearer ([ba954a6](https://github.com/rvben/sharepoint-cli/commit/ba954a6e78939bd47e1f3d8798e9fb501073db10))
+- **graph**: percent-encode user query in search URL ([74b8b57](https://github.com/rvben/sharepoint-cli/commit/74b8b57829f9d3eacd8130f1b3a44e243528fc0b))
+- **reference**: decode percent-escapes in colon-separated forms ([744736f](https://github.com/rvben/sharepoint-cli/commit/744736f0691e889dbbd4ce9cfc1529dc6478fd48))
+- **reference**: stop double-decoding id= query values ([d2eb4e2](https://github.com/rvben/sharepoint-cli/commit/d2eb4e29730954ad7b31f5e7aca5fe62eb0da41c))
+- **cli**: route clap parse errors through JSON-error-on-stdout contract ([a9e806e](https://github.com/rvben/sharepoint-cli/commit/a9e806e4bf4547e3852bddd49f786f3524e08d95))
+- **auth**: canonicalize tenant to GUID after login ([20dae78](https://github.com/rvben/sharepoint-cli/commit/20dae7865c41d3e18a3f5b03253895aca9b78452))
+
 ## [0.0.4](https://github.com/rvben/sharepoint-cli/compare/v0.0.3...v0.0.4) - 2026-05-04
 
 ### Fixed
