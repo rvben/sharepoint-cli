@@ -19,6 +19,12 @@ use serde::Deserialize;
 use tokio::time::sleep;
 
 use crate::error::{CliError, Result};
+use crate::util;
+
+/// Maximum number of automatic retries on transient token-endpoint errors
+/// (5xx, 429, connection failures). Does not apply to the normal
+/// authorization_pending / slow_down state-machine cycles.
+const MAX_TOKEN_RETRIES: u32 = 3;
 
 /// Structured OAuth2 error response from the token endpoint.
 #[derive(Debug, Clone, Deserialize)]
@@ -152,6 +158,64 @@ pub async fn request_device_code(
     Ok(parsed)
 }
 
+/// POST `url` with the given form fields, retrying on 5xx / 429 / connection
+/// failures up to [`MAX_TOKEN_RETRIES`] times with exponential backoff.
+/// Honors `Retry-After` response headers. Returns the final `(status, body)`.
+///
+/// Terminal 4xx responses (except 408 Request Timeout and 429) are returned
+/// immediately without retry — they indicate a hard auth failure.
+async fn send_with_retry(
+    client: &reqwest::Client,
+    url: &str,
+    form: &[(&str, &str)],
+) -> Result<(reqwest::StatusCode, String)> {
+    let mut attempt: u32 = 0;
+    loop {
+        let result = client.post(url).form(form).send().await;
+
+        match result {
+            Err(e) if attempt < MAX_TOKEN_RETRIES => {
+                // Connection-level failure (timeout, reset, DNS): retry.
+                let backoff = 2u64.pow(attempt);
+                tracing::debug!("token endpoint connection error (attempt {attempt}): {e}; retrying in {backoff}s");
+                sleep(Duration::from_secs(backoff)).await;
+                attempt += 1;
+                continue;
+            }
+            Err(e) => return Err(CliError::Http(format!("token endpoint: {e}"))),
+            Ok(resp) => {
+                let status = resp.status();
+                let retry_after = resp
+                    .headers()
+                    .get("Retry-After")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(util::parse_retry_after);
+                let body = resp.text().await.unwrap_or_default();
+
+                // Retry on 429 and 5xx; return everything else immediately.
+                let should_retry = (status == reqwest::StatusCode::TOO_MANY_REQUESTS
+                    || status == reqwest::StatusCode::REQUEST_TIMEOUT
+                    || status.is_server_error())
+                    && attempt < MAX_TOKEN_RETRIES;
+
+                if should_retry {
+                    let secs = retry_after
+                        .map(|d| d.as_secs())
+                        .unwrap_or_else(|| 2u64.pow(attempt));
+                    tracing::debug!(
+                        "token endpoint transient error {status} (attempt {attempt}); retrying in {secs}s"
+                    );
+                    sleep(Duration::from_secs(secs)).await;
+                    attempt += 1;
+                    continue;
+                }
+
+                return Ok((status, body));
+            }
+        }
+    }
+}
+
 pub async fn poll_for_token(
     client: &reqwest::Client,
     login_endpoint: &str,
@@ -173,18 +237,18 @@ pub async fn poll_for_token(
         sleep(Duration::from_secs(interval)).await;
         elapsed = elapsed.saturating_add(interval);
 
-        let resp = client
-            .post(&url)
-            .form(&[
+        // Inner retry loop handles transient errors (5xx, 429, connection
+        // failures) without consuming device-code expiry budget.
+        let (status, body) = send_with_retry(
+            client,
+            &url,
+            &[
                 ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
                 ("client_id", client_id),
                 ("device_code", device_code),
-            ])
-            .send()
-            .await?;
-
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
+            ],
+        )
+        .await?;
 
         if status.is_success() {
             let raw: RawTokenSuccess = serde_json::from_str(&body).map_err(|e| {
@@ -247,7 +311,9 @@ pub async fn poll_for_token(
                 }
             },
             Err(_) => {
-                tracing::debug!("device-code polling failed ({status}) with unparseable body: {body}");
+                tracing::debug!(
+                    "device-code polling failed ({status}) with unparseable body: {body}"
+                );
                 return Err(CliError::Auth(format!(
                     "token endpoint returned HTTP {status} with unparseable body"
                 )));
@@ -265,18 +331,17 @@ pub async fn refresh(
     scope: &str,
 ) -> Result<TokenResponse> {
     let url = format!("{login_endpoint}/{tenant}/oauth2/v2.0/token");
-    let resp = client
-        .post(&url)
-        .form(&[
+    let (status, body) = send_with_retry(
+        client,
+        &url,
+        &[
             ("grant_type", "refresh_token"),
             ("client_id", client_id),
             ("refresh_token", refresh_token),
             ("scope", scope),
-        ])
-        .send()
-        .await?;
-    let status = resp.status();
-    let body = resp.text().await.unwrap_or_default();
+        ],
+    )
+    .await?;
     if status.is_success() {
         let raw: RawTokenSuccess = serde_json::from_str(&body).map_err(|e| {
             tracing::debug!("refresh response body (parse error): {body}");

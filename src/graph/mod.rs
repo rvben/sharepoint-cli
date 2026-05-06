@@ -13,12 +13,10 @@ use tokio::time::sleep;
 
 use crate::auth::AuthContext;
 use crate::error::{CliError, Result};
+use crate::util;
 
 /// Maximum number of automatic retries on 429 / 5xx.
 const MAX_RETRIES: u32 = 3;
-/// Cap on `Retry-After` header value (seconds) — prevents a hostile or
-/// misconfigured upstream from blocking the CLI for hours.
-const MAX_RETRY_AFTER_SECS: u64 = 60;
 
 #[derive(Clone)]
 pub struct GraphClient {
@@ -91,7 +89,7 @@ impl GraphClient {
                 .headers()
                 .get("Retry-After")
                 .and_then(|v| v.to_str().ok())
-                .and_then(parse_retry_after);
+                .and_then(util::parse_retry_after);
 
             let body_text = resp.text().await.unwrap_or_default();
             let cfg = self.auth.config().await;
@@ -146,29 +144,6 @@ pub struct PagedResponse<T> {
     pub value: Vec<T>,
     #[serde(rename = "@odata.nextLink", default)]
     pub next_link: Option<String>,
-}
-
-/// Parse the value of a `Retry-After` header as a `Duration`.
-///
-/// Accepts both numeric seconds (e.g. `"30"`) and HTTP-date form
-/// (e.g. `"Thu, 01 Jan 2026 00:00:30 GMT"`), per RFC 7231 §7.1.3.
-/// The result is capped at `MAX_RETRY_AFTER_SECS`.
-fn parse_retry_after(header: &str) -> Option<Duration> {
-    let s = header.trim();
-    // Numeric seconds (primary form used by Graph).
-    if let Ok(secs) = s.parse::<u64>() {
-        return Some(Duration::from_secs(secs.min(MAX_RETRY_AFTER_SECS)));
-    }
-    // HTTP-date form (used by Graph for long-throttled accounts).
-    if let Ok(when) = httpdate::parse_http_date(s) {
-        let now = std::time::SystemTime::now();
-        if let Ok(delta) = when.duration_since(now) {
-            return Some(Duration::from_secs(
-                delta.as_secs().min(MAX_RETRY_AFTER_SECS),
-            ));
-        }
-    }
-    None
 }
 
 fn map_status(status: StatusCode, body: &str, detail: &str) -> CliError {
@@ -306,32 +281,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_retry_after_accepts_numeric_seconds() {
-        let d = parse_retry_after("30").expect("numeric should parse");
-        assert_eq!(d.as_secs(), 30);
-    }
-
-    #[test]
-    fn parse_retry_after_clamps_to_max() {
-        let d = parse_retry_after("9999").expect("numeric should parse");
-        assert_eq!(d.as_secs(), MAX_RETRY_AFTER_SECS);
-    }
-
-    #[test]
-    fn parse_retry_after_accepts_http_date_in_the_future() {
-        let when = std::time::SystemTime::now() + std::time::Duration::from_secs(5);
-        let header = httpdate::fmt_http_date(when);
-        let d = parse_retry_after(&header).expect("HTTP-date should parse");
-        // Allow 0..=10s to account for sub-second clock drift between creation and parsing.
-        assert!(d.as_secs() <= 10, "got {d:?}");
-    }
-
-    #[test]
-    fn parse_retry_after_rejects_garbage() {
-        assert!(parse_retry_after("not-a-time").is_none());
-    }
-
-    #[test]
     fn cursor_round_trips_with_skip() {
         let url = "https://graph.microsoft.com/v1.0/sites?$skiptoken=ABC";
         let cursor = Cursor {
@@ -384,12 +333,4 @@ mod tests {
         assert!(matches!(err, CliError::Input(_)));
     }
 
-    #[test]
-    fn parse_retry_after_rejects_past_http_date() {
-        // A date in the past yields duration_since error — returns None.
-        let when = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
-        let header = httpdate::fmt_http_date(when);
-        // The date is in the past (epoch + ~11 days), so duration_since(now) fails.
-        assert!(parse_retry_after(&header).is_none());
-    }
 }
