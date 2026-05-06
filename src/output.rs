@@ -42,6 +42,17 @@ impl OutputConfig {
         }
     }
 
+    /// Print an interactive prompt that the user MUST see to proceed.
+    ///
+    /// Device-code prompts (verification URL, user code) are interactive
+    /// instructions, not optional status messages. They are emitted
+    /// unconditionally to stderr regardless of `--quiet` or `--json`.
+    /// Stderr is used even in `--json` mode to keep the JSON stdout stream
+    /// clean and parseable by agents.
+    pub fn print_required_prompt(&self, msg: &str) {
+        eprintln!("{msg}");
+    }
+
     /// Print serialized JSON to stdout.
     pub fn print_json(&self, value: &serde_json::Value) {
         println!(

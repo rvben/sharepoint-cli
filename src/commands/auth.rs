@@ -35,7 +35,7 @@ async fn login(rt: &Runtime) -> Result<()> {
         device_code::request_device_code(&http, &rt.cfg.login_endpoint, &tenant, &client_id, scope)
             .await?;
 
-    rt.out.print_message(&format!(
+    rt.out.print_required_prompt(&format!(
         "To sign in, open {}\nand enter code: {}",
         dc.verification_uri, dc.user_code
     ));
