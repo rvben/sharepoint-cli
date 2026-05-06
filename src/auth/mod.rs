@@ -85,6 +85,16 @@ impl AuthContext {
     /// Get a non-expired access token, refreshing if necessary.
     ///
     /// Honors `SHAREPOINT_ACCESS_TOKEN` as a CI escape hatch (no refresh).
+    ///
+    /// When `SHAREPOINT_REFRESH_TOKEN` is set in the environment (propagated
+    /// via `ResolvedConfig::refresh_token_seed`) and no valid cached token
+    /// exists, the refresh token is used to bootstrap an access token via the
+    /// OAuth refresh exchange.  This supports headless/CI usage where a
+    /// long-lived refresh token is injected at runtime rather than stored in a
+    /// persistent cache.  If the bootstrap refresh exchange fails (e.g. the
+    /// token has been revoked), the error is surfaced immediately with auth
+    /// exit code 3 — there is no silent fallback to interactive device-code
+    /// flow, because the caller explicitly provided a token.
     pub async fn access_token(&self) -> Result<String> {
         let (mutex, notify) = &*self.inner;
 
@@ -96,9 +106,14 @@ impl AuthContext {
             }
         }
 
+        // Whether we have already seeded the cache from `SHAREPOINT_REFRESH_TOKEN`
+        // this call.  Guards against an infinite loop in case the seeded entry
+        // is somehow still stale after one refresh attempt.
+        let mut env_seed_applied = false;
+
         loop {
             // --- Phase 1: snapshot config (lock held briefly) ---
-            let (tenant_opt, client_id_opt, cache_path, http, login_endpoint, read_only) = {
+            let (tenant_opt, client_id_opt, cache_path, http, login_endpoint, read_only, rt_seed) = {
                 let guard = mutex.lock().await;
                 (
                     guard.cfg.tenant_id.clone(),
@@ -107,6 +122,7 @@ impl AuthContext {
                     guard.http.clone(),
                     guard.cfg.login_endpoint.clone(),
                     guard.cfg.read_only,
+                    guard.cfg.refresh_token_seed.clone(),
                 )
                 // lock released here
             };
@@ -128,16 +144,43 @@ impl AuthContext {
             // --- Phase 2: read token cache from disk (no lock held) ---
             let cache = token_cache::load(&cache_path)?;
             let prefix = format!("{tenant}:{client_id}:");
-            let (key, entry) = cache
+            let cache_hit = cache
                 .entries
                 .iter()
                 .find(|(k, _)| k.starts_with(&prefix))
-                .map(|(k, e)| (k.clone(), e.clone()))
-                .ok_or_else(|| {
-                    CliError::Auth(
+                .map(|(k, e)| (k.clone(), e.clone()));
+
+            // When no cache entry exists, try bootstrapping from the env-var
+            // refresh token (CI/headless use case).  Only attempt once per
+            // `access_token()` call to avoid an infinite retry loop.
+            let (key, entry) = match cache_hit {
+                Some(pair) => pair,
+                None => {
+                    if !env_seed_applied && let Some(rt) = rt_seed {
+                        // Seed the cache with an expired placeholder so the
+                        // normal refresh path below can exchange it for real tokens.
+                        let seed_key = token_cache::cache_key(&tenant, &client_id, "seeded");
+                        let seed_entry = token_cache::CacheEntry {
+                            account: token_cache::Account {
+                                username: "seeded".into(),
+                                name: Some("seeded".to_string()),
+                                tenant_id: tenant.clone(),
+                                oid: "seeded".into(),
+                            },
+                            access_token: String::new(),
+                            access_token_expires_at: Utc::now() - Duration::seconds(1),
+                            refresh_token: Some(rt),
+                            scopes: vec![],
+                        };
+                        token_cache::upsert(&cache_path, &seed_key, seed_entry)?;
+                        env_seed_applied = true;
+                        continue; // Re-enter the loop to pick up the seeded entry.
+                    }
+                    return Err(CliError::Auth(
                         "no cached credentials for this tenant; run `sharepoint auth login`".into(),
-                    )
-                })?;
+                    ));
+                }
+            };
 
             // Token still fresh — return immediately.
             if entry.access_token_expires_at - Utc::now() > Duration::seconds(REFRESH_MARGIN_SECS) {
@@ -221,40 +264,6 @@ impl AuthContext {
 
     pub async fn cache_path(&self) -> PathBuf {
         self.inner.0.lock().await.cache_path.clone()
-    }
-
-    /// Seed the cache from `SHAREPOINT_REFRESH_TOKEN` (CI use case). The next
-    /// `access_token()` call will refresh and persist the rotated token.
-    /// `oid_for_seed` is a synthetic identifier — the real one comes back on first refresh.
-    pub async fn seed_from_env_refresh_token(&self, refresh_token: &str) -> Result<()> {
-        // Snapshot what we need under lock, then do disk I/O without it.
-        let (tenant, client_id, cache_path) = {
-            let guard = self.inner.0.lock().await;
-            let tenant = guard
-                .cfg
-                .tenant_id
-                .clone()
-                .ok_or_else(|| CliError::Auth("seed: tenant_id required".into()))?;
-            let client_id = require_client_id(&guard.cfg)?;
-            (tenant, client_id, guard.cache_path.clone())
-            // lock released here
-        };
-
-        let key = token_cache::cache_key(&tenant, &client_id, "seeded");
-        let entry = token_cache::CacheEntry {
-            account: token_cache::Account {
-                username: "seeded".into(),
-                name: Some("seeded".to_string()),
-                tenant_id: tenant,
-                oid: "seeded".into(),
-            },
-            access_token: String::new(),
-            access_token_expires_at: Utc::now() - Duration::seconds(1),
-            refresh_token: Some(refresh_token.to_string()),
-            scopes: vec![],
-        };
-        token_cache::upsert(&cache_path, &key, entry)?;
-        Ok(())
     }
 }
 
