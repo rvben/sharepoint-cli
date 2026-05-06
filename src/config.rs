@@ -6,6 +6,7 @@
 //! plays the special-default role.
 
 use std::collections::BTreeMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -84,15 +85,51 @@ pub fn load_file(path: &Path) -> Result<ConfigFile> {
 }
 
 pub fn save_file(path: &Path, cfg: &ConfigFile) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| CliError::Other(format!("mkdir {}: {e}", parent.display())))?;
-    }
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(parent)
+        .map_err(|e| CliError::Other(format!("mkdir {}: {e}", parent.display())))?;
+
     let body = toml::to_string_pretty(cfg)
         .map_err(|e| CliError::Other(format!("serialize config: {e}")))?;
-    std::fs::write(path, body)
-        .map_err(|e| CliError::Other(format!("write {}: {e}", path.display())))?;
+
+    // Write to a tempfile in the same directory, then rename into place so a
+    // mid-write crash never leaves a truncated or partially-written config.
+    let mut tmp = tempfile::Builder::new()
+        .prefix(".config-")
+        .suffix(".toml.tmp")
+        .tempfile_in(parent)
+        .map_err(|e| CliError::Other(format!("tempfile in {}: {e}", parent.display())))?;
+    tmp.write_all(body.as_bytes())
+        .map_err(|e| CliError::Other(format!("write tempfile: {e}")))?;
+    tmp.flush()
+        .map_err(|e| CliError::Other(format!("flush tempfile: {e}")))?;
+
+    set_mode_0600(tmp.path())?;
+    tmp.persist(path)
+        .map_err(|e| CliError::Other(format!("persist tempfile: {e}")))?;
     Ok(())
+}
+
+#[cfg(unix)]
+fn set_mode_0600(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let perms = std::fs::Permissions::from_mode(0o600);
+    std::fs::set_permissions(path, perms)
+        .map_err(|e| CliError::Other(format!("chmod 0600 {}: {e}", path.display())))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn set_mode_0600(_path: &Path) -> Result<()> {
+    Ok(())
+}
+
+/// Update a profile's tenant_id in the file and persist atomically.
+pub fn write_profile_tenant_id(path: &Path, profile: &str, tenant_id: &str) -> Result<()> {
+    let mut file = load_file(path)?;
+    let entry = file.profile.entry(profile.to_string()).or_default();
+    entry.tenant_id = Some(tenant_id.to_string());
+    save_file(path, &file)
 }
 
 fn parse_bool_env(value: &str) -> bool {
@@ -264,5 +301,34 @@ mod tests {
         let path = dir.path().join("does-not-exist.toml");
         let cfg = load_file(&path).unwrap();
         assert!(cfg.profile.is_empty());
+    }
+
+    #[test]
+    fn save_file_does_not_leave_temp_artifacts_on_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sharepoint").join("config.toml");
+        let mut file = ConfigFile::default();
+        file.profile
+            .entry("default".to_string())
+            .or_default()
+            .tenant_id = Some("11111111-1111-1111-1111-111111111111".to_string());
+        save_file(&path, &file).unwrap();
+        // Round-trip works.
+        let reloaded = load_file(&path).unwrap();
+        assert_eq!(
+            reloaded
+                .profile
+                .get("default")
+                .and_then(|p| p.tenant_id.as_deref()),
+            Some("11111111-1111-1111-1111-111111111111"),
+        );
+        // No leftover temp files in the parent.
+        let parent = path.parent().unwrap();
+        let leftovers: Vec<_> = std::fs::read_dir(parent)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name() != "config.toml")
+            .collect();
+        assert!(leftovers.is_empty(), "temp file left behind: {leftovers:?}");
     }
 }

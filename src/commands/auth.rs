@@ -4,6 +4,7 @@ use chrono::{Duration, Utc};
 
 use crate::auth::{device_code, require_client_id, token_cache};
 use crate::cli::{AuthCmd, Runtime};
+use crate::config;
 use crate::error::{CliError, Result};
 
 pub async fn run(rt: &Runtime, cmd: AuthCmd) -> Result<()> {
@@ -51,6 +52,14 @@ async fn login(rt: &Runtime) -> Result<()> {
     .await?;
 
     let claims = device_code::decode_id_token(&resp.id_token)?;
+
+    // Canonicalize the configured tenant to the authoritative GUID from the id
+    // token. The user may have entered a domain (e.g. contoso.onmicrosoft.com);
+    // the cache key uses claims.tid, so the configured tenant must match.
+    if rt.cfg.tenant_id.as_deref() != Some(claims.tid.as_str()) {
+        config::write_profile_tenant_id(&rt.config_path, &rt.cfg.profile_name, &claims.tid)?;
+    }
+
     let key = token_cache::cache_key(&claims.tid, &client_id, &claims.oid);
     let entry = token_cache::CacheEntry {
         account: token_cache::Account {
