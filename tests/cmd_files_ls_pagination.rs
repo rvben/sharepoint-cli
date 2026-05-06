@@ -1,9 +1,7 @@
-#![cfg(target_os = "linux")]
-
 use assert_cmd::Command;
 use chrono::{Duration, Utc};
 use sharepoint_cli::auth::token_cache::{Account, CacheEntry, cache_key, upsert};
-use wiremock::matchers::{method, path, query_param};
+use wiremock::matchers::{method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn seed_cache(dir: &std::path::Path) {
@@ -56,6 +54,7 @@ async fn mount_page1(server: &MockServer) -> String {
 
     Mock::given(method("GET"))
         .and(path("/drives/D1/root/children"))
+        .and(query_param_is_missing("$skiptoken"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "@odata.nextLink": next_link,
             "value": [

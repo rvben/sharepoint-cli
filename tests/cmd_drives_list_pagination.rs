@@ -1,9 +1,7 @@
-#![cfg(target_os = "linux")]
-
 use assert_cmd::Command;
 use chrono::{Duration, Utc};
 use sharepoint_cli::auth::token_cache::{Account, CacheEntry, cache_key, upsert};
-use wiremock::matchers::{method, path};
+use wiremock::matchers::{method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn seed_cache(dir: &std::path::Path) {
@@ -48,6 +46,7 @@ async fn drives_list_all_follows_next_link() {
     // First page: 3 drives + nextLink
     Mock::given(method("GET"))
         .and(path("/sites/S1/drives"))
+        .and(query_param_is_missing("$skiptoken"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "@odata.nextLink": next_link,
             "value": [
@@ -62,6 +61,7 @@ async fn drives_list_all_follows_next_link() {
     // Second page: 3 more drives, no nextLink
     Mock::given(method("GET"))
         .and(path("/sites/S1/drives"))
+        .and(query_param("$skiptoken", "PAGE2"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "value": [
                 {"id": "d4", "name": "D4", "driveType": "documentLibrary", "webUrl": "https://x"},
