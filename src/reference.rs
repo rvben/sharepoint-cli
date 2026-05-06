@@ -104,7 +104,9 @@ fn parse_url(raw: &str) -> Result<ParsedRef> {
         .as_ref()
         .map(|(k, v)| (k.as_str(), v.as_str()))
     {
-        let decoded = percent_decode(value);
+        // Url::query_pairs() already percent-decodes the value once. Decoding
+        // again would corrupt user-typed literal percent sequences.
+        let decoded = value.to_string();
         // `decoded` looks like `/sites/Marketing/Shared Documents/2025/Q4/plan.pptx`.
         // Strip the `/sites/<name>/` prefix to find library + path.
         let trimmed = decoded.trim_start_matches('/');
