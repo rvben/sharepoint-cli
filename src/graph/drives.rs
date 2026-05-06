@@ -8,76 +8,73 @@ use super::{GraphClient, PagedResponse};
 use crate::error::{CliError, Result};
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Drive {
-    pub id: String,
-    pub name: String,
+pub(crate) struct Drive {
+    pub(crate) id: String,
+    pub(crate) name: String,
     #[serde(rename = "driveType", default)]
-    pub drive_type: String,
-    #[serde(rename = "webUrl", default)]
-    pub web_url: String,
+    pub(crate) drive_type: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct DriveItem {
-    pub id: String,
-    pub name: String,
+pub(crate) struct DriveItem {
+    pub(crate) id: String,
+    pub(crate) name: String,
     #[serde(default)]
-    pub size: u64,
+    pub(crate) size: u64,
     #[serde(rename = "eTag", default)]
-    pub etag: Option<String>,
+    pub(crate) etag: Option<String>,
     #[serde(rename = "webUrl", default)]
-    pub web_url: Option<String>,
+    pub(crate) web_url: Option<String>,
     #[serde(rename = "createdDateTime", default)]
-    pub created: Option<String>,
+    pub(crate) created: Option<String>,
     #[serde(rename = "lastModifiedDateTime", default)]
-    pub modified: Option<String>,
+    pub(crate) modified: Option<String>,
     #[serde(rename = "parentReference", default)]
-    pub parent_reference: Option<ParentReference>,
+    pub(crate) parent_reference: Option<ParentReference>,
     #[serde(default)]
-    pub folder: Option<Folder>,
+    pub(crate) folder: Option<Folder>,
     #[serde(default)]
-    pub file: Option<File>,
+    pub(crate) file: Option<File>,
     /// Pre-authenticated short-lived URL — only populated by `/driveItem`
     /// `?select=...&expand=...` when explicitly requested. We never include
     /// it in canonical_json() output unless the caller asks for `stat`.
     #[serde(rename = "@microsoft.graph.downloadUrl", default)]
-    pub download_url: Option<String>,
+    pub(crate) download_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-pub struct ParentReference {
-    #[serde(rename = "driveId", default)]
-    pub drive_id: String,
+pub(crate) struct ParentReference {
     #[serde(rename = "path", default)]
-    pub path: String,
+    pub(crate) path: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Folder {
-    #[serde(rename = "childCount", default)]
-    pub child_count: u64,
-}
+pub(crate) struct Folder {}
 
 #[derive(Debug, Clone, Deserialize, Default)]
-pub struct File {
+pub(crate) struct File {
     #[serde(default)]
-    pub hashes: Hashes,
+    pub(crate) hashes: Hashes,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-pub struct Hashes {
+pub(crate) struct Hashes {
     #[serde(rename = "quickXorHash", default)]
-    pub quick_xor: Option<String>,
+    pub(crate) quick_xor: Option<String>,
     #[serde(rename = "sha1Hash", default)]
-    pub sha1: Option<String>,
+    pub(crate) sha1: Option<String>,
 }
 
-pub async fn list_drives(graph: &GraphClient, site_id: &str) -> Result<Vec<Drive>> {
+pub(crate) async fn list_drives(graph: &GraphClient, site_id: &str) -> Result<Vec<Drive>> {
     let first_path = format!("/sites/{site_id}/drives");
     graph.page_all(&first_path).await
 }
 
-pub async fn find_drive_by_name(graph: &GraphClient, site_id: &str, name: &str) -> Result<Drive> {
+pub(crate) async fn find_drive_by_name(
+    graph: &GraphClient,
+    site_id: &str,
+    name: &str,
+) -> Result<Drive> {
     let drives = list_drives(graph, site_id).await?;
     let lower = name.to_ascii_lowercase();
     drives
@@ -96,21 +93,8 @@ pub async fn find_drive_by_name(graph: &GraphClient, site_id: &str, name: &str) 
         })
 }
 
-/// `path` here is the leading-slash path within the drive root, e.g. "/folder/file.txt".
-/// Empty / "/" means the drive root.
-pub async fn get_item(graph: &GraphClient, drive_id: &str, path: &str) -> Result<DriveItem> {
-    let api = if path.is_empty() || path == "/" {
-        format!("/drives/{drive_id}/root")
-    } else {
-        let trimmed = path.trim_start_matches('/');
-        let encoded = encode_path_segments(trimmed);
-        format!("/drives/{drive_id}/root:/{encoded}")
-    };
-    graph.get_json(&api).await
-}
-
 /// Get an item with the `@microsoft.graph.downloadUrl` field populated.
-pub async fn get_item_with_download_url(
+pub(crate) async fn get_item_with_download_url(
     graph: &GraphClient,
     drive_id: &str,
     path: &str,
@@ -127,18 +111,18 @@ pub async fn get_item_with_download_url(
     graph.get_json(&api).await
 }
 
-pub struct ListChildrenResult {
-    pub items: Vec<DriveItem>,
+pub(crate) struct ListChildrenResult {
+    pub(crate) items: Vec<DriveItem>,
     /// The raw `@odata.nextLink` URL returned by Graph, if there are more items.
-    pub next_url: Option<String>,
+    pub(crate) next_url: Option<String>,
     /// The URL that was actually fetched (the `page_url` argument resolved to a
     /// full URL). Used by callers that need to encode a mid-page cursor.
-    pub fetched_url: String,
+    pub(crate) fetched_url: String,
 }
 
 /// Fetch one page of children. `page_url` is the full Graph URL to fetch;
 /// when `None` the default first-page path is derived from `drive_id` and `path`.
-pub async fn list_children(
+pub(crate) async fn list_children(
     graph: &GraphClient,
     drive_id: &str,
     path: &str,
@@ -167,7 +151,7 @@ pub async fn list_children(
     })
 }
 
-pub async fn list_children_recursive(
+pub(crate) async fn list_children_recursive(
     graph: &GraphClient,
     drive_id: &str,
     path: &str,
@@ -203,7 +187,7 @@ fn item_path(parent: &str, name: &str) -> String {
 }
 
 /// Canonical-shape JSON per spec (every list/show command emits this shape).
-pub fn canonical_json(
+pub(crate) fn canonical_json(
     item: &DriveItem,
     site: &super::sites::Site,
     drive: &Drive,
@@ -308,7 +292,6 @@ mod tests {
             id: "S1".into(),
             display_name: "Marketing".into(),
             web_url: "https://contoso.sharepoint.com/sites/Marketing".into(),
-            url_segment: "Marketing".into(),
         }
     }
 
@@ -317,7 +300,6 @@ mod tests {
             id: "D1".into(),
             name: "Documents".into(),
             drive_type: "documentLibrary".into(),
-            web_url: String::new(),
         }
     }
 
@@ -332,7 +314,6 @@ mod tests {
             created: Some("2025-01-01T00:00:00Z".into()),
             modified: Some("2025-02-01T00:00:00Z".into()),
             parent_reference: Some(ParentReference {
-                drive_id: "D1".into(),
                 path: "/drives/D1/root:/Folder".into(),
             }),
             folder: None,

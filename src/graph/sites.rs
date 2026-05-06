@@ -15,37 +15,35 @@ use crate::error::{CliError, Result};
 use crate::reference::SiteRef;
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Site {
-    pub id: String,
+pub(crate) struct Site {
+    pub(crate) id: String,
     #[serde(rename = "displayName", default)]
-    pub display_name: String,
+    pub(crate) display_name: String,
     #[serde(rename = "webUrl")]
-    pub web_url: String,
-    #[serde(rename = "name", default)]
-    pub url_segment: String,
+    pub(crate) web_url: String,
 }
 
 #[derive(Debug, Clone)]
-pub enum SiteListSource {
+pub(crate) enum SiteListSource {
     Followed,
     Search,
 }
 
-pub struct SiteListResult {
-    pub items: Vec<Site>,
+pub(crate) struct SiteListResult {
+    pub(crate) items: Vec<Site>,
     /// The raw `@odata.nextLink` URL returned by Graph, if there are more results.
-    pub next_url: Option<String>,
+    pub(crate) next_url: Option<String>,
     /// The URL that was actually fetched. Used by callers that need to encode a
     /// mid-page cursor.
-    pub fetched_url: String,
-    pub source: SiteListSource,
+    pub(crate) fetched_url: String,
+    pub(crate) source: SiteListSource,
 }
 
 /// Without `query`: returns the user's followed sites.
 /// With `query`: keyword search across the tenant.
 /// `page_url` is a raw Graph URL for continuation; when `None` the first page
 /// is fetched using the default path derived from `query`.
-pub async fn list(
+pub(crate) async fn list(
     graph: &GraphClient,
     query: Option<&str>,
     page_url: Option<&str>,
@@ -74,7 +72,7 @@ pub async fn list(
 }
 
 /// Resolve a site by URL (`/sites/{hostname}:/{path}`).
-pub async fn get_by_url(graph: &GraphClient, url: &str) -> Result<Site> {
+pub(crate) async fn get_by_url(graph: &GraphClient, url: &str) -> Result<Site> {
     let parsed = url::Url::parse(url)
         .map_err(|e| CliError::Input(format!("invalid site URL '{url}': {e}")))?;
     let host = parsed
@@ -86,7 +84,7 @@ pub async fn get_by_url(graph: &GraphClient, url: &str) -> Result<Site> {
 }
 
 /// Resolve a site by name (alias map first, then `/sites?search=`).
-pub async fn resolve(
+pub(crate) async fn resolve(
     graph: &GraphClient,
     site_ref: &SiteRef,
     aliases: &BTreeMap<String, String>,

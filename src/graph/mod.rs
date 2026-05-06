@@ -28,13 +28,9 @@ impl GraphClient {
         Self { auth }
     }
 
-    pub fn auth(&self) -> &AuthContext {
-        &self.auth
-    }
-
     /// Build a fully-qualified URL from a path. Accepts both absolute URLs
     /// (used when following `@odata.nextLink`) and bare paths.
-    pub async fn url(&self, path: &str) -> String {
+    pub(crate) async fn url(&self, path: &str) -> String {
         if path.starts_with("http://") || path.starts_with("https://") {
             return path.to_string();
         }
@@ -57,7 +53,7 @@ impl GraphClient {
 
     /// Perform a request that returns a streaming body (e.g., download).
     /// `body` is cloned per retry attempt; pass `None` for GET/HEAD.
-    pub async fn send(
+    pub(crate) async fn send(
         &self,
         method: Method,
         path: &str,
@@ -122,12 +118,12 @@ impl GraphClient {
     }
 
     /// Return the configured Graph API endpoint (e.g. `"https://graph.microsoft.com/v1.0"`).
-    pub async fn graph_endpoint(&self) -> String {
+    pub(crate) async fn graph_endpoint(&self) -> String {
         self.auth.config().await.graph_endpoint.clone()
     }
 
     /// Drain a paged collection by following `@odata.nextLink` until exhausted.
-    pub async fn page_all<T: DeserializeOwned>(&self, first_path: &str) -> Result<Vec<T>> {
+    pub(crate) async fn page_all<T: DeserializeOwned>(&self, first_path: &str) -> Result<Vec<T>> {
         let mut acc = Vec::new();
         let mut next = Some(first_path.to_string());
         while let Some(p) = next.take() {
@@ -140,10 +136,10 @@ impl GraphClient {
 }
 
 #[derive(serde::Deserialize)]
-pub struct PagedResponse<T> {
-    pub value: Vec<T>,
+pub(crate) struct PagedResponse<T> {
+    pub(crate) value: Vec<T>,
     #[serde(rename = "@odata.nextLink", default)]
-    pub next_link: Option<String>,
+    pub(crate) next_link: Option<String>,
 }
 
 fn map_status(status: StatusCode, body: &str, detail: &str) -> CliError {
@@ -187,7 +183,7 @@ pub fn encode_cursor(cursor: &Cursor) -> String {
 /// `cursor.next` has a host matching the configured Graph endpoint.
 /// Tokens whose host does not match are rejected to prevent bearer-token
 /// leakage to untrusted hosts.
-pub fn decode_cursor(graph_endpoint: &str, token: &str) -> Result<Cursor> {
+pub(crate) fn decode_cursor(graph_endpoint: &str, token: &str) -> Result<Cursor> {
     use base64::Engine as _;
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(token.as_bytes())
@@ -236,9 +232,9 @@ fn extract_graph_error_message(body: &str) -> Option<String> {
 }
 
 pub mod download;
-pub mod drives;
-pub mod search;
-pub mod sites;
+pub(crate) mod drives;
+pub(crate) mod search;
+pub(crate) mod sites;
 
 #[cfg(test)]
 mod tests {
@@ -332,5 +328,4 @@ mod tests {
         let err = decode_cursor("https://graph.microsoft.com/v1.0", &old_token).unwrap_err();
         assert!(matches!(err, CliError::Input(_)));
     }
-
 }

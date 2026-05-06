@@ -35,7 +35,7 @@ const REFRESH_MARGIN_SECS: i64 = 60;
 
 /// Pull `client_id` out of resolved config or return a helpful Auth error.
 /// Used by every codepath that needs to talk to the Entra token endpoints.
-pub fn require_client_id(cfg: &ResolvedConfig) -> Result<String> {
+pub(crate) fn require_client_id(cfg: &ResolvedConfig) -> Result<String> {
     cfg.client_id.clone().ok_or_else(|| {
         CliError::Auth(
             "client_id is required: register an Entra public-client app and set it via \
@@ -76,10 +76,6 @@ impl AuthContext {
         Self {
             inner: Arc::new((Mutex::new(state), Notify::new())),
         }
-    }
-
-    pub async fn client_id(&self) -> Result<String> {
-        require_client_id(&self.inner.0.lock().await.cfg)
     }
 
     /// Get a non-expired access token, refreshing if necessary.
@@ -254,16 +250,12 @@ impl AuthContext {
         }
     }
 
-    pub async fn http(&self) -> reqwest::Client {
+    pub(crate) async fn http(&self) -> reqwest::Client {
         self.inner.0.lock().await.http.clone()
     }
 
-    pub async fn config(&self) -> ResolvedConfig {
+    pub(crate) async fn config(&self) -> ResolvedConfig {
         self.inner.0.lock().await.cfg.clone()
-    }
-
-    pub async fn cache_path(&self) -> PathBuf {
-        self.inner.0.lock().await.cache_path.clone()
     }
 }
 

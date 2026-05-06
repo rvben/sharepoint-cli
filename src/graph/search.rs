@@ -7,18 +7,18 @@ use super::drives::DriveItem;
 use super::{GraphClient, PagedResponse};
 use crate::error::Result;
 
-pub struct SearchResult {
-    pub items: Vec<DriveItem>,
+pub(crate) struct SearchResult {
+    pub(crate) items: Vec<DriveItem>,
     /// The raw `@odata.nextLink` URL returned by Graph, if there are more results.
-    pub next_url: Option<String>,
+    pub(crate) next_url: Option<String>,
     /// The URL that was actually fetched. Used by callers that need to encode a
     /// mid-page cursor.
-    pub fetched_url: String,
+    pub(crate) fetched_url: String,
 }
 
 /// Execute a drive search. `page_url` is the full Graph URL to fetch;
 /// when `None` the default search URL is constructed from `drive_id` and `query`.
-pub async fn search(
+pub(crate) async fn search(
     graph: &GraphClient,
     drive_id: &str,
     query: &str,
@@ -69,7 +69,7 @@ fn url_encode_query(input: &str) -> String {
 
 /// Shell-style glob match. `*` matches any run of characters, `?` matches one.
 /// Case-insensitive.
-pub fn glob_matches(pattern: &str, name: &str) -> bool {
+pub(crate) fn glob_matches(pattern: &str, name: &str) -> bool {
     let p = pattern.to_ascii_lowercase();
     let n = name.to_ascii_lowercase();
     glob_inner(p.as_bytes(), n.as_bytes())

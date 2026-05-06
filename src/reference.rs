@@ -30,12 +30,6 @@ pub struct ParsedRef {
     pub path: String,
 }
 
-impl ParsedRef {
-    pub fn root_path(&self) -> bool {
-        self.path.is_empty() || self.path == "/"
-    }
-}
-
 fn percent_decode(input: &str) -> String {
     // Lightweight percent-decoder — handles `%20` etc. without pulling in another dep.
     let bytes = input.as_bytes();
@@ -325,7 +319,6 @@ mod tests {
     #[test]
     fn library_only_path_normalizes_to_root() {
         let r = parse(":Documents", false).unwrap();
-        assert!(r.root_path());
         assert_eq!(r.path, "");
     }
 
