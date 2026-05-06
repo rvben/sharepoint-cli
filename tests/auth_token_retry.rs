@@ -86,6 +86,93 @@ async fn poll_fails_after_retry_exhaustion() {
     );
 }
 
+/// Four consecutive 503s on the refresh path exhaust retries and produce a
+/// structured error without leaking the raw response body.
+#[tokio::test]
+async fn refresh_fails_after_retry_exhaustion() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/tenant/oauth2/v2.0/token"))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&server)
+        .await;
+
+    let client = reqwest::Client::new();
+    let err = tokio::time::timeout(
+        Duration::from_secs(30),
+        refresh(
+            &client,
+            &server.uri(),
+            "tenant",
+            "cid",
+            "RT-OLD",
+            "User.Read",
+        ),
+    )
+    .await
+    .expect("timed out")
+    .unwrap_err();
+
+    let msg = err.to_string();
+    // Must be a structured error — no raw body leakage.
+    assert!(
+        msg.contains("503") || msg.contains("unparseable"),
+        "error message should mention status or unparseable: {msg}"
+    );
+
+    // Exactly 4 requests: 1 initial + 3 retries.
+    assert_eq!(
+        server.received_requests().await.unwrap().len(),
+        4,
+        "expected 4 attempts (1 initial + 3 retries)"
+    );
+}
+
+/// An OAuth2Error whose error_description contains a token-shaped substring
+/// must not propagate that substring into the CliError message.
+#[tokio::test]
+async fn refresh_error_description_redacts_token_shaped_substrings() {
+    let server = MockServer::start().await;
+
+    // Simulate an attacker-controlled or misconfigured endpoint that echoes
+    // a token-shaped value inside error_description.
+    Mock::given(method("POST"))
+        .and(path("/tenant/oauth2/v2.0/token"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+            "error": "server_error",
+            "error_description": r#"something went wrong {"access_token":"EXFIL"} here"#
+        })))
+        .mount(&server)
+        .await;
+
+    let client = reqwest::Client::new();
+    let err = tokio::time::timeout(
+        Duration::from_secs(5),
+        refresh(
+            &client,
+            &server.uri(),
+            "tenant",
+            "cid",
+            "RT-OLD",
+            "User.Read",
+        ),
+    )
+    .await
+    .expect("timed out")
+    .unwrap_err();
+
+    let msg = err.to_string();
+    assert!(
+        !msg.contains("EXFIL"),
+        "token-shaped value must not appear in error message: {msg}"
+    );
+    assert!(
+        msg.contains("[REDACTED]"),
+        "redaction marker must appear in error message: {msg}"
+    );
+}
+
 /// Refresh also recovers from a single 503.
 #[tokio::test]
 async fn refresh_retries_on_single_503_then_succeeds() {
@@ -112,7 +199,14 @@ async fn refresh_retries_on_single_503_then_succeeds() {
     let client = reqwest::Client::new();
     let tok = tokio::time::timeout(
         Duration::from_secs(15),
-        refresh(&client, &server.uri(), "tenant", "cid", "RT-OLD", "User.Read"),
+        refresh(
+            &client,
+            &server.uri(),
+            "tenant",
+            "cid",
+            "RT-OLD",
+            "User.Read",
+        ),
     )
     .await
     .expect("timed out")
