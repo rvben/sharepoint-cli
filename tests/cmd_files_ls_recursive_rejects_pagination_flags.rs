@@ -1,5 +1,3 @@
-#![cfg(target_os = "linux")]
-
 use assert_cmd::Command;
 use predicates::str::contains;
 
@@ -51,6 +49,25 @@ fn recursive_with_page_rejected() {
             "--recursive",
             "--page",
             "abc",
+            "Lib",
+        ])
+        .assert()
+        .code(2)
+        .stdout(contains("recursive"));
+}
+
+#[test]
+fn recursive_with_limit_200_rejected() {
+    // --limit 200 happens to equal the default, but because the user explicitly
+    // supplied it as Option<usize>::Some(200), it must still be rejected.
+    base()
+        .args([
+            "--json",
+            "files",
+            "ls",
+            "--recursive",
+            "--limit",
+            "200",
             "Lib",
         ])
         .assert()

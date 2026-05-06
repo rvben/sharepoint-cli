@@ -118,8 +118,8 @@ pub enum FilesCmd {
         reference: String,
         #[arg(short = 'r', long)]
         recursive: bool,
-        #[arg(long, default_value_t = 200)]
-        limit: usize,
+        #[arg(long)]
+        limit: Option<usize>,
         #[arg(long)]
         all: bool,
         #[arg(long)]

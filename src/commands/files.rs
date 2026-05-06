@@ -93,22 +93,25 @@ pub async fn run(rt: &Runtime, cmd: FilesCmd) -> Result<()> {
     }
 }
 
+const DEFAULT_LIMIT: usize = 200;
+
 async fn ls(
     rt: &Runtime,
     reference: &str,
     recursive: bool,
-    limit: usize,
+    limit: Option<usize>,
     all: bool,
     page: Option<&str>,
 ) -> Result<()> {
+    if recursive && (limit.is_some() || all || page.is_some()) {
+        return Err(CliError::Input(
+            "`--recursive` cannot be combined with `--limit`/`--all`/`--page`; it always returns the full tree".into(),
+        ));
+    }
+
     let (graph, r) = resolve(rt, reference).await?;
 
     if recursive {
-        if all || page.is_some() || limit != 200 {
-            return Err(CliError::Input(
-                "`--recursive` cannot be combined with `--limit`/`--all`/`--page`; it always returns the full tree".into(),
-            ));
-        }
         let items = drives::list_children_recursive(&graph, &r.drive.id, &r.parsed.path).await?;
 
         if rt.out.json {
@@ -150,6 +153,7 @@ async fn ls(
     }
 
     // Paginated single-level listing.
+    let effective_limit = limit.unwrap_or(DEFAULT_LIMIT);
     let (mut current_url, mut skip) = if let Some(token) = page {
         let endpoint = graph.graph_endpoint().await;
         let cursor = decode_cursor(&endpoint, token)?;
@@ -170,7 +174,7 @@ async fn ls(
                 continue;
             }
             items.push(it.clone());
-            if !all && items.len() >= limit {
+            if !all && items.len() >= effective_limit {
                 // Mid-page: point the cursor back at the same page with updated skip.
                 let consumed_in_page = idx + 1;
                 break 'outer Some(Cursor {
@@ -181,16 +185,15 @@ async fn ls(
         }
         skip = 0;
 
-        if all {
-            if pageres.next_url.is_none() {
-                break None;
+        match pageres.next_url {
+            None => break None,
+            Some(url) if !all && items.len() >= effective_limit => {
+                break Some(Cursor {
+                    next: Some(url),
+                    skip: 0,
+                });
             }
-            current_url = pageres.next_url;
-        } else {
-            break pageres.next_url.map(|url| Cursor {
-                next: Some(url),
-                skip: 0,
-            });
+            Some(url) => current_url = Some(url),
         }
     };
 
@@ -356,6 +359,10 @@ async fn find(
             items.push(it.clone());
             if !all && items.len() >= limit {
                 // Mid-page: note how many raw items from this page we consumed.
+                // `skip` is a raw-item index, not a post-filter count. Resume correctness
+                // relies on the glob filter being stateless: re-applying it to the same
+                // items on the resumed page yields identical filter decisions, so no item
+                // is double-emitted or skipped.
                 let consumed_raw = idx + 1;
                 break 'outer Some(Cursor {
                     next: Some(res.fetched_url),

@@ -1,5 +1,3 @@
-#![cfg(target_os = "linux")]
-
 use assert_cmd::Command;
 use predicates::str::contains;
 use sharepoint_cli::graph::{Cursor, encode_cursor};
