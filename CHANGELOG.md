@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 
 
+
+## [0.0.6](https://github.com/rvben/sharepoint-cli/compare/v0.0.5...v0.0.6) - 2026-05-06
+
 ## [0.0.5](https://github.com/rvben/sharepoint-cli/compare/v0.0.4...v0.0.5) - 2026-05-06
 
 ### Added
