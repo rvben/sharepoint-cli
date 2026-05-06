@@ -123,6 +123,11 @@ impl GraphClient {
         }
     }
 
+    /// Return the configured Graph API endpoint (e.g. `"https://graph.microsoft.com/v1.0"`).
+    pub async fn graph_endpoint(&self) -> String {
+        self.auth.config().await.graph_endpoint.clone()
+    }
+
     /// Drain a paged collection by following `@odata.nextLink` until exhausted.
     pub async fn page_all<T: DeserializeOwned>(&self, first_path: &str) -> Result<Vec<T>> {
         let mut acc = Vec::new();
@@ -178,6 +183,39 @@ fn map_status(status: StatusCode, body: &str, detail: &str) -> CliError {
             message: format!("{primary}{detail}"),
         },
     }
+}
+
+/// Encode a Graph `@odata.nextLink` URL as a base64 page token for `--page`.
+pub fn encode_page_token(next_link: &str) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(next_link.as_bytes())
+}
+
+/// Decode a `--page` token back to its Graph URL, validating that the URL's
+/// host matches the configured Graph endpoint. Tokens whose host does not
+/// match `graph_endpoint` are rejected to prevent bearer-token leakage.
+pub fn decode_page_token(graph_endpoint: &str, token: &str) -> Result<String> {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(token.as_bytes())
+        .map_err(|_| CliError::Input("invalid page token (not base64)".into()))?;
+    let s = String::from_utf8(bytes)
+        .map_err(|_| CliError::Input("invalid page token (not utf-8)".into()))?;
+    let token_url = url::Url::parse(&s)
+        .map_err(|_| CliError::Input("invalid page token (not a URL)".into()))?;
+    let allowed = url::Url::parse(graph_endpoint)
+        .map_err(|_| CliError::Other("invalid configured graph_endpoint".into()))?;
+    let allowed_host = allowed
+        .host_str()
+        .ok_or_else(|| CliError::Other("graph_endpoint must have a host".into()))?;
+    if token_url.host_str() != Some(allowed_host) {
+        return Err(CliError::Input(format!(
+            "page token host mismatch: token points at {:?}, expected {:?} — refusing to follow untrusted host",
+            token_url.host_str(),
+            allowed_host
+        )));
+    }
+    Ok(s)
 }
 
 fn extract_graph_error_message(body: &str) -> Option<String> {
@@ -261,6 +299,30 @@ mod tests {
     #[test]
     fn parse_retry_after_rejects_garbage() {
         assert!(parse_retry_after("not-a-time").is_none());
+    }
+
+    #[test]
+    fn decode_page_token_rejects_token_pointing_at_wrong_host() {
+        use base64::Engine as _;
+        let attacker = "https://attacker.example/v1.0/sites?$skiptoken=evil";
+        let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(attacker.as_bytes());
+        let err = decode_page_token("https://graph.microsoft.com/v1.0", &token).unwrap_err();
+        assert!(matches!(err, CliError::Input(_)));
+        assert!(err.to_string().contains("host"));
+    }
+
+    #[test]
+    fn decode_page_token_accepts_matching_host() {
+        let url = "https://graph.microsoft.com/v1.0/sites?$skiptoken=ABC";
+        let encoded = encode_page_token(url);
+        let decoded = decode_page_token("https://graph.microsoft.com/v1.0", &encoded).unwrap();
+        assert_eq!(decoded, url);
+    }
+
+    #[test]
+    fn decode_page_token_rejects_invalid_base64() {
+        let err = decode_page_token("https://graph.microsoft.com/v1.0", "!!!").unwrap_err();
+        assert!(matches!(err, CliError::Input(_)));
     }
 
     #[test]

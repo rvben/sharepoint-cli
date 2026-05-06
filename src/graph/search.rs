@@ -3,12 +3,9 @@
 //! The `find` command uses this and adds client-side glob filtering on top
 //! when `--name <glob>` is given.
 
-use base64::Engine as _;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-
 use super::drives::DriveItem;
-use super::{GraphClient, PagedResponse};
-use crate::error::{CliError, Result};
+use super::{GraphClient, PagedResponse, decode_page_token, encode_page_token};
+use crate::error::Result;
 
 pub struct SearchResult {
     pub items: Vec<DriveItem>,
@@ -22,7 +19,10 @@ pub async fn search(
     page_token: Option<&str>,
 ) -> Result<SearchResult> {
     let api = match page_token {
-        Some(t) => decode_page_token(t)?,
+        Some(t) => {
+            let endpoint = graph.graph_endpoint().await;
+            decode_page_token(&endpoint, t)?
+        }
         None => build_search_url(&format!("drives/{drive_id}"), query),
     };
     let page: PagedResponse<DriveItem> = graph.get_json(&api).await?;
@@ -89,17 +89,6 @@ fn glob_inner(pat: &[u8], s: &[u8]) -> bool {
         }
     }
     dp[m][n]
-}
-
-fn encode_page_token(next_link: &str) -> String {
-    URL_SAFE_NO_PAD.encode(next_link.as_bytes())
-}
-
-fn decode_page_token(token: &str) -> Result<String> {
-    let bytes = URL_SAFE_NO_PAD
-        .decode(token.as_bytes())
-        .map_err(|e| CliError::Input(format!("invalid --page token: {e}")))?;
-    String::from_utf8(bytes).map_err(|e| CliError::Input(format!("invalid --page token: {e}")))
 }
 
 #[cfg(test)]

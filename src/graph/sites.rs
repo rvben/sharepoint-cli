@@ -8,11 +8,9 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use base64::Engine as _;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::Deserialize;
 
-use super::GraphClient;
+use super::{GraphClient, decode_page_token, encode_page_token};
 use crate::error::{CliError, Result};
 use crate::reference::SiteRef;
 
@@ -48,7 +46,8 @@ pub async fn list(
 ) -> Result<SiteListResult> {
     let (path, source) = match (query, page_token) {
         (_, Some(token)) => {
-            let decoded = decode_page_token(token)?;
+            let endpoint = graph.graph_endpoint().await;
+            let decoded = decode_page_token(&endpoint, token)?;
             let source = source_for_path(&decoded);
             (decoded, source)
         }
@@ -134,17 +133,6 @@ fn urlencoding(input: &str) -> String {
     out
 }
 
-fn encode_page_token(next_link: &str) -> String {
-    URL_SAFE_NO_PAD.encode(next_link.as_bytes())
-}
-
-fn decode_page_token(token: &str) -> Result<String> {
-    let bytes = URL_SAFE_NO_PAD
-        .decode(token.as_bytes())
-        .map_err(|e| CliError::Input(format!("invalid --page token: {e}")))?;
-    String::from_utf8(bytes).map_err(|e| CliError::Input(format!("invalid --page token: {e}")))
-}
-
 /// Derive the list source from a decoded page-token path.
 fn source_for_path(path: &str) -> SiteListSource {
     if path.contains("/me/followedSites") {
@@ -162,7 +150,7 @@ mod tests {
     fn page_token_round_trips() {
         let original = "https://graph.microsoft.com/v1.0/sites?$skiptoken=ABC";
         let encoded = encode_page_token(original);
-        let decoded = decode_page_token(&encoded).unwrap();
+        let decoded = decode_page_token("https://graph.microsoft.com/v1.0", &encoded).unwrap();
         assert_eq!(decoded, original);
     }
 

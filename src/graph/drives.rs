@@ -2,11 +2,9 @@
 
 use std::fmt::Write as _;
 
-use base64::Engine as _;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::Deserialize;
 
-use super::{GraphClient, PagedResponse};
+use super::{GraphClient, PagedResponse, decode_page_token, encode_page_token};
 use crate::error::{CliError, Result};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -142,7 +140,10 @@ pub async fn list_children(
     page_token: Option<&str>,
 ) -> Result<ListChildrenResult> {
     let api = match page_token {
-        Some(t) => decode_page_token(t)?,
+        Some(t) => {
+            let endpoint = graph.graph_endpoint().await;
+            decode_page_token(&endpoint, t)?
+        }
         None => {
             if path.is_empty() || path == "/" {
                 format!("/drives/{drive_id}/root/children")
@@ -290,17 +291,6 @@ pub(super) fn encode_path_segments(path: &str) -> String {
         }
     }
     out
-}
-
-fn encode_page_token(next_link: &str) -> String {
-    URL_SAFE_NO_PAD.encode(next_link.as_bytes())
-}
-
-fn decode_page_token(token: &str) -> Result<String> {
-    let bytes = URL_SAFE_NO_PAD
-        .decode(token.as_bytes())
-        .map_err(|e| CliError::Input(format!("invalid --page token: {e}")))?;
-    String::from_utf8(bytes).map_err(|e| CliError::Input(format!("invalid --page token: {e}")))
 }
 
 #[cfg(test)]
