@@ -1,5 +1,3 @@
-#![cfg(target_os = "linux")]
-
 use assert_cmd::Command;
 use chrono::{Duration, Utc};
 use predicates::prelude::PredicateBooleanExt;
@@ -107,8 +105,10 @@ async fn files_find_filters_by_glob() {
     baseline_mocks(&server).await;
 
     // When only --name is provided (no --query), the binary defaults to q='*'.
+    // The query is percent-encoded before hitting Graph (`*` → `%2A`), so the
+    // mock path must use the encoded form.
     Mock::given(method("GET"))
-        .and(path("/drives/D1/root/search(q='*')"))
+        .and(path("/drives/D1/root/search(q='%2A')"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "value": [
                 {
