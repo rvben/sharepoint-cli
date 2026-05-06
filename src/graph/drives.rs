@@ -73,9 +73,8 @@ pub struct Hashes {
 }
 
 pub async fn list_drives(graph: &GraphClient, site_id: &str) -> Result<Vec<Drive>> {
-    let path = format!("/sites/{site_id}/drives");
-    let page: PagedResponse<Drive> = graph.get_json(&path).await?;
-    Ok(page.value)
+    let first_path = format!("/sites/{site_id}/drives");
+    graph.page_all(&first_path).await
 }
 
 pub async fn find_drive_by_name(graph: &GraphClient, site_id: &str, name: &str) -> Result<Drive> {
