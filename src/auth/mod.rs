@@ -16,11 +16,19 @@ use crate::error::{CliError, Result};
 pub mod device_code;
 pub mod token_cache;
 
-/// Default Entra app `client_id` shipped in the binary.
-/// Replace this with the GUID captured in Prereq B before publishing.
-pub const DEFAULT_CLIENT_ID: &str = "REPLACE_WITH_REAL_CLIENT_ID";
-
 const REFRESH_MARGIN_SECS: i64 = 60;
+
+/// Pull `client_id` out of resolved config or return a helpful Auth error.
+/// Used by every codepath that needs to talk to the Entra token endpoints.
+pub fn require_client_id(cfg: &ResolvedConfig) -> Result<String> {
+    cfg.client_id.clone().ok_or_else(|| {
+        CliError::Auth(
+            "client_id is required: register an Entra public-client app and set it via \
+             --client-id, SHAREPOINT_CLIENT_ID, or `sharepoint init`"
+                .into(),
+        )
+    })
+}
 
 #[derive(Clone)]
 pub struct AuthContext {
@@ -48,14 +56,8 @@ impl AuthContext {
         }
     }
 
-    pub async fn client_id(&self) -> String {
-        self.inner
-            .lock()
-            .await
-            .cfg
-            .client_id
-            .clone()
-            .unwrap_or_else(|| DEFAULT_CLIENT_ID.to_string())
+    pub async fn client_id(&self) -> Result<String> {
+        require_client_id(&self.inner.lock().await.cfg)
     }
 
     /// Get a non-expired access token, refreshing if necessary.
@@ -72,11 +74,7 @@ impl AuthContext {
                 "no tenant_id configured; run `sharepoint init` or set SHAREPOINT_TENANT_ID".into(),
             )
         })?;
-        let client_id = guard
-            .cfg
-            .client_id
-            .clone()
-            .unwrap_or_else(|| DEFAULT_CLIENT_ID.to_string());
+        let client_id = require_client_id(&guard.cfg)?;
 
         let cache = token_cache::load(&guard.cache_path)?;
 
@@ -146,11 +144,7 @@ impl AuthContext {
             .tenant_id
             .clone()
             .ok_or_else(|| CliError::Auth("seed: tenant_id required".into()))?;
-        let client_id = guard
-            .cfg
-            .client_id
-            .clone()
-            .unwrap_or_else(|| DEFAULT_CLIENT_ID.to_string());
+        let client_id = require_client_id(&guard.cfg)?;
         let key = token_cache::cache_key(&tenant, &client_id, "seeded");
         let entry = token_cache::CacheEntry {
             account: token_cache::Account {

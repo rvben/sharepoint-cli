@@ -30,6 +30,15 @@ pub async fn run(rt: &Runtime) -> Result<()> {
     if tenant.is_empty() {
         return Err(CliError::Input("tenant is required".into()));
     }
+    let client_id = prompt(&mut lines, "Client ID (Entra public-client app GUID): ")?;
+    if client_id.is_empty() {
+        return Err(CliError::Input(
+            "client_id is required: register an Entra public-client app \
+             (device-code flow, delegated Files.Read.All / Sites.Read.All / offline_access \
+             scopes) and paste its Application (client) ID here"
+                .into(),
+        ));
+    }
     let default_site = prompt(
         &mut lines,
         "Default site name or URL (optional, press enter to skip): ",
@@ -39,6 +48,7 @@ pub async fn run(rt: &Runtime) -> Result<()> {
     let mut file = rt.config_file.clone();
     let entry = file.profile.entry(profile_name.clone()).or_default();
     entry.tenant_id = Some(tenant.clone());
+    entry.client_id = Some(client_id.clone());
     if !default_site.is_empty() {
         entry.default_site = Some(default_site.clone());
     }
@@ -49,6 +59,7 @@ pub async fn run(rt: &Runtime) -> Result<()> {
     // Re-build runtime so the new config is loaded for the auth-login call.
     let mut updated = rt.cfg.clone();
     updated.tenant_id = Some(tenant);
+    updated.client_id = Some(client_id);
     updated.default_site = if default_site.is_empty() {
         file.profile
             .get(&profile_name)

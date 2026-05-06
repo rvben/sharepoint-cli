@@ -60,11 +60,16 @@ sharepoint files find   <site>:<library>/ --name '*.pdf'
 
 Config lives at `$XDG_CONFIG_HOME/sharepoint/config.toml` (or `~/.config/sharepoint/config.toml`). Run `sharepoint config path` to print the resolved location.
 
+You must supply two things before signing in:
+
+- A **tenant** (your Microsoft 365 domain or tenant GUID).
+- A **client_id** for an Entra public-client app you've registered. The app needs the device-code flow enabled and delegated `Files.Read.All`, `Sites.Read.All`, and `offline_access` scopes. `sharepoint init` walks you through saving both into the active profile.
+
 Environment overrides:
 
 - `SHAREPOINT_PROFILE` — active profile name
 - `SHAREPOINT_TENANT_ID` — tenant override
-- `SHAREPOINT_CLIENT_ID` — Azure AD application ID
+- `SHAREPOINT_CLIENT_ID` — Entra application (client) ID — **required**
 
 ## License
 

@@ -2,7 +2,7 @@
 
 use chrono::{Duration, Utc};
 
-use crate::auth::{DEFAULT_CLIENT_ID, device_code, token_cache};
+use crate::auth::{device_code, require_client_id, token_cache};
 use crate::cli::{AuthCmd, Runtime};
 use crate::error::{CliError, Result};
 
@@ -22,11 +22,7 @@ async fn login(rt: &Runtime) -> Result<()> {
             "no tenant configured; run `sharepoint init` or pass --tenant <domain-or-guid>".into(),
         )
     })?;
-    let client_id = rt
-        .cfg
-        .client_id
-        .clone()
-        .unwrap_or_else(|| DEFAULT_CLIENT_ID.to_string());
+    let client_id = require_client_id(&rt.cfg)?;
     let scope = device_code::default_scope(rt.cfg.read_only);
 
     let http = reqwest::Client::builder()
@@ -88,11 +84,7 @@ async fn logout(rt: &Runtime) -> Result<()> {
         .tenant_id
         .clone()
         .ok_or_else(|| CliError::Input("no tenant configured".into()))?;
-    let client_id = rt
-        .cfg
-        .client_id
-        .clone()
-        .unwrap_or_else(|| DEFAULT_CLIENT_ID.to_string());
+    let client_id = require_client_id(&rt.cfg)?;
     let cache = token_cache::load(&rt.cache_path)?;
     let prefix = format!("{tenant}:{client_id}:");
     let keys: Vec<String> = cache
