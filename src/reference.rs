@@ -198,8 +198,8 @@ pub fn parse(raw: &str, default_site_set: bool) -> Result<ParsedRef> {
         }
         return Ok(ParsedRef {
             site: SiteRef::Default,
-            library: Some(library),
-            path: normalize_path(&path),
+            library: Some(percent_decode(&library)),
+            path: normalize_path(&percent_decode(&path)),
         });
     }
 
@@ -213,9 +213,9 @@ pub fn parse(raw: &str, default_site_set: bool) -> Result<ParsedRef> {
             return Err(CliError::Input(format!("'{raw}' has no library after ':'")));
         }
         return Ok(ParsedRef {
-            site: SiteRef::Name(site.to_string()),
-            library: Some(library),
-            path: normalize_path(&path),
+            site: SiteRef::Name(percent_decode(site)),
+            library: Some(percent_decode(&library)),
+            path: normalize_path(&percent_decode(&path)),
         });
     }
 
@@ -227,8 +227,8 @@ pub fn parse(raw: &str, default_site_set: bool) -> Result<ParsedRef> {
         }
         return Ok(ParsedRef {
             site: SiteRef::Default,
-            library: Some(library),
-            path: normalize_path(&path),
+            library: Some(percent_decode(&library)),
+            path: normalize_path(&percent_decode(&path)),
         });
     }
 
@@ -330,9 +330,52 @@ mod tests {
     }
 
     #[test]
-    fn percent_decoded_paths_decode() {
+    fn percent_escapes_in_colon_form_path_are_decoded() {
         let r = parse(":Documents/Hello%20World.txt", false).unwrap();
-        // We don't decode here — only the URL form does that. Bare paths are taken literally.
-        assert_eq!(r.path, "/Hello%20World.txt");
+        assert_eq!(r.path, "/Hello World.txt");
+    }
+
+    #[test]
+    fn parses_id_query_with_literal_percent() {
+        // `Url::query_pairs()` decodes exactly one layer of percent-encoding. When
+        // the source contains double-encoded sequences (e.g. SharePoint encodes a
+        // space as `%20`, then a transport layer encodes the `%` to `%25`,
+        // producing `%2520`), one decode pass yields `%20` — which is part of
+        // SharePoint's own path and must NOT be decoded again.
+        let r = parse(
+            "https://contoso.sharepoint.com/sites/Marketing/Forms/AllItems.aspx?id=%2Fsites%2FMarketing%2FShared%2520Documents%2Ffile%2520name.pptx",
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            r.site,
+            SiteRef::Url("https://contoso.sharepoint.com/sites/Marketing".into())
+        );
+        assert_eq!(r.library.as_deref(), Some("Shared%20Documents"));
+        assert_eq!(r.path, "/file%20name.pptx");
+    }
+
+    #[test]
+    fn site_colon_library_decodes_percent_escapes() {
+        let r = parse("My%20Site:My%20Library/foo.txt", false).unwrap();
+        assert_eq!(r.site, SiteRef::Name("My Site".into()));
+        assert_eq!(r.library.as_deref(), Some("My Library"));
+        assert_eq!(r.path, "/foo.txt");
+    }
+
+    #[test]
+    fn default_site_colon_form_decodes_percent_escapes() {
+        let r = parse(":My%20Library/foo%20bar.txt", false).unwrap();
+        assert_eq!(r.site, SiteRef::Default);
+        assert_eq!(r.library.as_deref(), Some("My Library"));
+        assert_eq!(r.path, "/foo bar.txt");
+    }
+
+    #[test]
+    fn bare_library_path_decodes_percent_escapes() {
+        let r = parse("My%20Library/foo%20bar.txt", true).unwrap();
+        assert_eq!(r.site, SiteRef::Default);
+        assert_eq!(r.library.as_deref(), Some("My Library"));
+        assert_eq!(r.path, "/foo bar.txt");
     }
 }
