@@ -104,6 +104,11 @@ async fn ls(
     let (graph, r) = resolve(rt, reference).await?;
 
     if recursive {
+        if all || page.is_some() || limit != 200 {
+            return Err(CliError::Input(
+                "`--recursive` cannot be combined with `--limit`/`--all`/`--page`; it always returns the full tree".into(),
+            ));
+        }
         let items = drives::list_children_recursive(&graph, &r.drive.id, &r.parsed.path).await?;
 
         if rt.out.json {
