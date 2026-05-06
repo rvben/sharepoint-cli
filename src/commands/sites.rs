@@ -4,7 +4,7 @@ use crate::auth::AuthContext;
 use crate::cli::{Runtime, SitesCmd};
 use crate::config;
 use crate::error::{CliError, Result};
-use crate::graph::{GraphClient, sites};
+use crate::graph::{Cursor, GraphClient, decode_cursor, encode_cursor, sites};
 
 pub async fn run(rt: &Runtime, cmd: SitesCmd) -> Result<()> {
     match cmd {
@@ -28,28 +28,57 @@ async fn list(
     let auth = AuthContext::new(rt.cfg.clone(), rt.cache_path.clone());
     let graph = GraphClient::new(auth);
 
+    // Decode the incoming page token to a (url, skip) cursor.
+    let (mut current_url, mut skip) = if let Some(token) = page {
+        let endpoint = graph.graph_endpoint().await;
+        let cursor = decode_cursor(&endpoint, token)?;
+        (cursor.next, cursor.skip)
+    } else {
+        (None, 0)
+    };
+
     let mut items = Vec::new();
-    let mut next_token: Option<String> = page.map(String::from);
-    let mut source_label;
-    loop {
-        let res = sites::list(&graph, query, next_token.as_deref()).await?;
+    let mut source_label: &str;
+
+    let out_cursor: Option<Cursor> = 'outer: loop {
+        let res = sites::list(&graph, query, current_url.as_deref()).await?;
         source_label = match res.source {
             sites::SiteListSource::Followed => "followed",
             sites::SiteListSource::Search => "search",
         };
-        for s in res.items {
-            items.push(s);
+
+        for (idx, s) in res.items.iter().enumerate() {
+            if idx < skip {
+                continue;
+            }
+            items.push(s.clone());
             if !all && items.len() >= limit {
-                break;
+                // Mid-page: cursor points back at the same URL with updated skip.
+                let consumed_in_page = idx + 1;
+                break 'outer Some(Cursor {
+                    next: Some(res.fetched_url),
+                    skip: consumed_in_page,
+                });
             }
         }
-        if !all || res.next.is_none() {
-            next_token = if all { None } else { res.next };
-            break;
-        }
-        next_token = res.next;
-    }
+        skip = 0;
 
+        if all {
+            if res.next_url.is_none() {
+                // Exhausted.
+                break None;
+            }
+            current_url = res.next_url;
+        } else {
+            // Not --all: emit next cursor pointing at the Graph nextLink.
+            break res.next_url.map(|url| Cursor {
+                next: Some(url),
+                skip: 0,
+            });
+        }
+    };
+
+    let next_token = out_cursor.as_ref().map(encode_cursor);
     let total = items.len();
     if rt.out.json {
         let json_items: Vec<_> = items

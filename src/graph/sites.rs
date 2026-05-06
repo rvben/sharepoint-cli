@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 
 use serde::Deserialize;
 
-use super::{GraphClient, decode_page_token, encode_page_token};
+use super::GraphClient;
 use crate::error::{CliError, Result};
 use crate::reference::SiteRef;
 
@@ -33,23 +33,27 @@ pub enum SiteListSource {
 
 pub struct SiteListResult {
     pub items: Vec<Site>,
-    pub next: Option<String>,
+    /// The raw `@odata.nextLink` URL returned by Graph, if there are more results.
+    pub next_url: Option<String>,
+    /// The URL that was actually fetched. Used by callers that need to encode a
+    /// mid-page cursor.
+    pub fetched_url: String,
     pub source: SiteListSource,
 }
 
 /// Without `query`: returns the user's followed sites.
 /// With `query`: keyword search across the tenant.
+/// `page_url` is a raw Graph URL for continuation; when `None` the first page
+/// is fetched using the default path derived from `query`.
 pub async fn list(
     graph: &GraphClient,
     query: Option<&str>,
-    page_token: Option<&str>,
+    page_url: Option<&str>,
 ) -> Result<SiteListResult> {
-    let (path, source) = match (query, page_token) {
-        (_, Some(token)) => {
-            let endpoint = graph.graph_endpoint().await;
-            let decoded = decode_page_token(&endpoint, token)?;
-            let source = source_for_path(&decoded);
-            (decoded, source)
+    let (path, source) = match (query, page_url) {
+        (_, Some(url)) => {
+            let source = source_for_path(url);
+            (url.to_string(), source)
         }
         (None, None) => ("/me/followedSites".to_string(), SiteListSource::Followed),
         (Some(q), None) => (
@@ -57,10 +61,14 @@ pub async fn list(
             SiteListSource::Search,
         ),
     };
-    let page: super::PagedResponse<Site> = graph.get_json(&path).await?;
+    // Resolve to a full absolute URL so the cursor stored in `fetched_url`
+    // is always a complete URL (required by the host-validation check on decode).
+    let absolute_url = graph.url(&path).await;
+    let page: super::PagedResponse<Site> = graph.get_json(&absolute_url).await?;
     Ok(SiteListResult {
         items: page.value,
-        next: page.next_link.as_deref().map(encode_page_token),
+        next_url: page.next_link,
+        fetched_url: absolute_url,
         source,
     })
 }
@@ -145,14 +153,6 @@ fn source_for_path(path: &str) -> SiteListSource {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn page_token_round_trips() {
-        let original = "https://graph.microsoft.com/v1.0/sites?$skiptoken=ABC";
-        let encoded = encode_page_token(original);
-        let decoded = decode_page_token("https://graph.microsoft.com/v1.0", &encoded).unwrap();
-        assert_eq!(decoded, original);
-    }
 
     #[test]
     fn url_encoding_handles_spaces() {

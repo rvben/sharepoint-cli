@@ -185,23 +185,53 @@ fn map_status(status: StatusCode, body: &str, detail: &str) -> CliError {
     }
 }
 
-/// Encode a Graph `@odata.nextLink` URL as a base64 page token for `--page`.
-pub fn encode_page_token(next_link: &str) -> String {
-    use base64::Engine as _;
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(next_link.as_bytes())
+/// A pagination cursor that tracks position across Graph pages.
+///
+/// Encoded as base64(JSON) in the `--page` / `next` fields so agents
+/// can resume exactly where they left off, even mid-page.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Cursor {
+    /// The Graph URL to fetch next. `None` means the collection is exhausted.
+    pub next: Option<String>,
+    /// Number of items to skip at the beginning of the page returned by `next`.
+    /// Non-zero only when `--limit` cut off partway through a Graph page.
+    #[serde(default)]
+    pub skip: usize,
 }
 
-/// Decode a `--page` token back to its Graph URL, validating that the URL's
-/// host matches the configured Graph endpoint. Tokens whose host does not
-/// match `graph_endpoint` are rejected to prevent bearer-token leakage.
-pub fn decode_page_token(graph_endpoint: &str, token: &str) -> Result<String> {
+/// Encode a `Cursor` as a base64url string suitable for the `--page` / `next`
+/// field. The encoding is base64(JSON) so the token is opaque to the caller.
+pub fn encode_cursor(cursor: &Cursor) -> String {
+    use base64::Engine as _;
+    let json = serde_json::to_string(cursor).expect("Cursor serialization is infallible");
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(json.as_bytes())
+}
+
+/// Decode a `--page` token back to a `Cursor`, validating that any URL in
+/// `cursor.next` has a host matching the configured Graph endpoint.
+/// Tokens whose host does not match are rejected to prevent bearer-token
+/// leakage to untrusted hosts.
+pub fn decode_cursor(graph_endpoint: &str, token: &str) -> Result<Cursor> {
     use base64::Engine as _;
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(token.as_bytes())
         .map_err(|_| CliError::Input("invalid page token (not base64)".into()))?;
     let s = String::from_utf8(bytes)
         .map_err(|_| CliError::Input("invalid page token (not utf-8)".into()))?;
-    let token_url = url::Url::parse(&s)
+    let cursor: Cursor =
+        serde_json::from_str(&s).map_err(|_| CliError::Input("invalid page token".into()))?;
+    if let Some(ref url) = cursor.next {
+        validate_token_host(graph_endpoint, url)?;
+    }
+    Ok(cursor)
+}
+
+/// Validate that `candidate` URL has the same host as `graph_endpoint`.
+/// Rejects tokens that point at an unexpected host to prevent bearer-token
+/// leakage.
+fn validate_token_host(graph_endpoint: &str, candidate: &str) -> Result<()> {
+    let token_url = url::Url::parse(candidate)
         .map_err(|_| CliError::Input("invalid page token (not a URL)".into()))?;
     let allowed = url::Url::parse(graph_endpoint)
         .map_err(|_| CliError::Other("invalid configured graph_endpoint".into()))?;
@@ -215,7 +245,7 @@ pub fn decode_page_token(graph_endpoint: &str, token: &str) -> Result<String> {
             allowed_host
         )));
     }
-    Ok(s)
+    Ok(())
 }
 
 fn extract_graph_error_message(body: &str) -> Option<String> {
@@ -302,26 +332,55 @@ mod tests {
     }
 
     #[test]
-    fn decode_page_token_rejects_token_pointing_at_wrong_host() {
-        use base64::Engine as _;
-        let attacker = "https://attacker.example/v1.0/sites?$skiptoken=evil";
-        let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(attacker.as_bytes());
-        let err = decode_page_token("https://graph.microsoft.com/v1.0", &token).unwrap_err();
+    fn cursor_round_trips_with_skip() {
+        let url = "https://graph.microsoft.com/v1.0/sites?$skiptoken=ABC";
+        let cursor = Cursor {
+            next: Some(url.to_string()),
+            skip: 42,
+        };
+        let encoded = encode_cursor(&cursor);
+        let decoded = decode_cursor("https://graph.microsoft.com/v1.0", &encoded).unwrap();
+        assert_eq!(decoded.next.as_deref(), Some(url));
+        assert_eq!(decoded.skip, 42);
+    }
+
+    #[test]
+    fn cursor_round_trips_exhausted() {
+        let cursor = Cursor {
+            next: None,
+            skip: 0,
+        };
+        let encoded = encode_cursor(&cursor);
+        let decoded = decode_cursor("https://graph.microsoft.com/v1.0", &encoded).unwrap();
+        assert!(decoded.next.is_none());
+        assert_eq!(decoded.skip, 0);
+    }
+
+    #[test]
+    fn decode_cursor_rejects_token_pointing_at_wrong_host() {
+        let cursor = Cursor {
+            next: Some("https://attacker.example/v1.0/sites?$skiptoken=evil".to_string()),
+            skip: 0,
+        };
+        let token = encode_cursor(&cursor);
+        let err = decode_cursor("https://graph.microsoft.com/v1.0", &token).unwrap_err();
         assert!(matches!(err, CliError::Input(_)));
         assert!(err.to_string().contains("host"));
     }
 
     #[test]
-    fn decode_page_token_accepts_matching_host() {
-        let url = "https://graph.microsoft.com/v1.0/sites?$skiptoken=ABC";
-        let encoded = encode_page_token(url);
-        let decoded = decode_page_token("https://graph.microsoft.com/v1.0", &encoded).unwrap();
-        assert_eq!(decoded, url);
+    fn decode_cursor_rejects_invalid_base64() {
+        let err = decode_cursor("https://graph.microsoft.com/v1.0", "!!!").unwrap_err();
+        assert!(matches!(err, CliError::Input(_)));
     }
 
     #[test]
-    fn decode_page_token_rejects_invalid_base64() {
-        let err = decode_page_token("https://graph.microsoft.com/v1.0", "!!!").unwrap_err();
+    fn decode_cursor_rejects_non_json_content() {
+        use base64::Engine as _;
+        // Simulate an old-format token: base64-encoded plain URL (not JSON).
+        let old_token = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(b"https://graph.microsoft.com/v1.0/sites?$skiptoken=old");
+        let err = decode_cursor("https://graph.microsoft.com/v1.0", &old_token).unwrap_err();
         assert!(matches!(err, CliError::Input(_)));
     }
 

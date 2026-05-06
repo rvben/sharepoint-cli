@@ -1,14 +1,16 @@
 #![cfg(target_os = "linux")]
 
 use assert_cmd::Command;
-use base64::Engine as _;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use predicates::str::contains;
+use sharepoint_cli::graph::{Cursor, encode_cursor};
 
 #[test]
 fn page_token_pointing_at_attacker_host_is_rejected() {
-    let attacker = "https://attacker.example/v1.0/sites?$skiptoken=evil";
-    let token = URL_SAFE_NO_PAD.encode(attacker.as_bytes());
+    let cursor = Cursor {
+        next: Some("https://attacker.example/v1.0/sites?$skiptoken=evil".to_string()),
+        skip: 0,
+    };
+    let token = encode_cursor(&cursor);
 
     let dir = tempfile::tempdir().unwrap();
 

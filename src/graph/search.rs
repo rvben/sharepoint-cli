@@ -4,31 +4,38 @@
 //! when `--name <glob>` is given.
 
 use super::drives::DriveItem;
-use super::{GraphClient, PagedResponse, decode_page_token, encode_page_token};
+use super::{GraphClient, PagedResponse};
 use crate::error::Result;
 
 pub struct SearchResult {
     pub items: Vec<DriveItem>,
-    pub next: Option<String>,
+    /// The raw `@odata.nextLink` URL returned by Graph, if there are more results.
+    pub next_url: Option<String>,
+    /// The URL that was actually fetched. Used by callers that need to encode a
+    /// mid-page cursor.
+    pub fetched_url: String,
 }
 
+/// Execute a drive search. `page_url` is the full Graph URL to fetch;
+/// when `None` the default search URL is constructed from `drive_id` and `query`.
 pub async fn search(
     graph: &GraphClient,
     drive_id: &str,
     query: &str,
-    page_token: Option<&str>,
+    page_url: Option<&str>,
 ) -> Result<SearchResult> {
-    let api = match page_token {
-        Some(t) => {
-            let endpoint = graph.graph_endpoint().await;
-            decode_page_token(&endpoint, t)?
-        }
+    let api = match page_url {
+        Some(url) => url.to_string(),
         None => build_search_url(&format!("drives/{drive_id}"), query),
     };
-    let page: PagedResponse<DriveItem> = graph.get_json(&api).await?;
+    // Resolve to a full absolute URL so the cursor stored in `fetched_url`
+    // is always a complete URL (required by the host-validation check on decode).
+    let absolute_url = graph.url(&api).await;
+    let page: PagedResponse<DriveItem> = graph.get_json(&absolute_url).await?;
     Ok(SearchResult {
         items: page.value,
-        next: page.next_link.as_deref().map(encode_page_token),
+        next_url: page.next_link,
+        fetched_url: absolute_url,
     })
 }
 

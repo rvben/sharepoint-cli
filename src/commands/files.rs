@@ -8,7 +8,7 @@ use crate::cli::{FilesCmd, Runtime};
 use crate::error::{CliError, Result};
 use crate::graph::drives::{Drive, canonical_json};
 use crate::graph::sites::Site;
-use crate::graph::{GraphClient, drives, search};
+use crate::graph::{Cursor, GraphClient, decode_cursor, drives, encode_cursor, search};
 use crate::output::terminal_width;
 use crate::reference::{ParsedRef, parse};
 
@@ -150,24 +150,51 @@ async fn ls(
     }
 
     // Paginated single-level listing.
+    let (mut current_url, mut skip) = if let Some(token) = page {
+        let endpoint = graph.graph_endpoint().await;
+        let cursor = decode_cursor(&endpoint, token)?;
+        (cursor.next, cursor.skip)
+    } else {
+        (None, 0)
+    };
+
     let mut items: Vec<_> = Vec::new();
-    let mut next = page.map(str::to_owned);
-    loop {
+
+    let out_cursor: Option<Cursor> = 'outer: loop {
         let pageres =
-            drives::list_children(&graph, &r.drive.id, &r.parsed.path, next.as_deref()).await?;
-        for it in pageres.items {
-            items.push(it);
+            drives::list_children(&graph, &r.drive.id, &r.parsed.path, current_url.as_deref())
+                .await?;
+
+        for (idx, it) in pageres.items.iter().enumerate() {
+            if idx < skip {
+                continue;
+            }
+            items.push(it.clone());
             if !all && items.len() >= limit {
-                break;
+                // Mid-page: point the cursor back at the same page with updated skip.
+                let consumed_in_page = idx + 1;
+                break 'outer Some(Cursor {
+                    next: Some(pageres.fetched_url),
+                    skip: consumed_in_page,
+                });
             }
         }
-        if !all || pageres.next.is_none() {
-            next = if all { None } else { pageres.next };
-            break;
+        skip = 0;
+
+        if all {
+            if pageres.next_url.is_none() {
+                break None;
+            }
+            current_url = pageres.next_url;
+        } else {
+            break pageres.next_url.map(|url| Cursor {
+                next: Some(url),
+                skip: 0,
+            });
         }
-        next = pageres.next;
-    }
-    let next_token = next;
+    };
+
+    let next_token = out_cursor.as_ref().map(encode_cursor);
 
     if rt.out.json {
         let json_items: Vec<_> = items
@@ -302,28 +329,56 @@ async fn find(
     // Permissive default query when only --name is given (Graph requires a query).
     let q = query.unwrap_or("*");
 
+    // Decode the incoming page token to a (url, skip) cursor.
+    let (mut current_url, mut skip) = if let Some(token) = page {
+        let endpoint = graph.graph_endpoint().await;
+        let cursor = decode_cursor(&endpoint, token)?;
+        (cursor.next, cursor.skip)
+    } else {
+        (None, 0)
+    };
+
     let mut items = Vec::new();
-    let mut next: Option<String> = page.map(String::from);
-    loop {
-        let res = search::search(&graph, &r.drive.id, q, next.as_deref()).await?;
-        for it in res.items {
+
+    let out_cursor: Option<Cursor> = 'outer: loop {
+        let res = search::search(&graph, &r.drive.id, q, current_url.as_deref()).await?;
+
+        for (idx, it) in res.items.iter().enumerate() {
+            if idx < skip {
+                continue;
+            }
+            // Apply optional glob filter without counting filtered items toward skip.
             if let Some(g) = name_glob
                 && !search::glob_matches(g, &it.name)
             {
                 continue;
             }
-            items.push(it);
+            items.push(it.clone());
             if !all && items.len() >= limit {
-                break;
+                // Mid-page: note how many raw items from this page we consumed.
+                let consumed_raw = idx + 1;
+                break 'outer Some(Cursor {
+                    next: Some(res.fetched_url),
+                    skip: consumed_raw,
+                });
             }
         }
-        if !all || res.next.is_none() {
-            next = if all { None } else { res.next };
-            break;
-        }
-        next = res.next;
-    }
+        skip = 0;
 
+        if all {
+            if res.next_url.is_none() {
+                break None;
+            }
+            current_url = res.next_url;
+        } else {
+            break res.next_url.map(|url| Cursor {
+                next: Some(url),
+                skip: 0,
+            });
+        }
+    };
+
+    let next_token = out_cursor.as_ref().map(encode_cursor);
     let total = items.len();
     if rt.out.json {
         let json_items: Vec<_> = items
@@ -332,7 +387,7 @@ async fn find(
             .collect();
         rt.out.print_json(&serde_json::json!({
             "total": total,
-            "next": next,
+            "next": next_token,
             "items": json_items,
         }));
     } else {

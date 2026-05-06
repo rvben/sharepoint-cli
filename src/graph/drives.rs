@@ -4,7 +4,7 @@ use std::fmt::Write as _;
 
 use serde::Deserialize;
 
-use super::{GraphClient, PagedResponse, decode_page_token, encode_page_token};
+use super::{GraphClient, PagedResponse};
 use crate::error::{CliError, Result};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -129,20 +129,23 @@ pub async fn get_item_with_download_url(
 
 pub struct ListChildrenResult {
     pub items: Vec<DriveItem>,
-    pub next: Option<String>,
+    /// The raw `@odata.nextLink` URL returned by Graph, if there are more items.
+    pub next_url: Option<String>,
+    /// The URL that was actually fetched (the `page_url` argument resolved to a
+    /// full URL). Used by callers that need to encode a mid-page cursor.
+    pub fetched_url: String,
 }
 
+/// Fetch one page of children. `page_url` is the full Graph URL to fetch;
+/// when `None` the default first-page path is derived from `drive_id` and `path`.
 pub async fn list_children(
     graph: &GraphClient,
     drive_id: &str,
     path: &str,
-    page_token: Option<&str>,
+    page_url: Option<&str>,
 ) -> Result<ListChildrenResult> {
-    let api = match page_token {
-        Some(t) => {
-            let endpoint = graph.graph_endpoint().await;
-            decode_page_token(&endpoint, t)?
-        }
+    let api = match page_url {
+        Some(url) => url.to_string(),
         None => {
             if path.is_empty() || path == "/" {
                 format!("/drives/{drive_id}/root/children")
@@ -153,10 +156,14 @@ pub async fn list_children(
             }
         }
     };
-    let page: PagedResponse<DriveItem> = graph.get_json(&api).await?;
+    // Resolve to a full absolute URL so the cursor stored in `fetched_url`
+    // is always a complete URL (required by the host-validation check on decode).
+    let absolute_url = graph.url(&api).await;
+    let page: PagedResponse<DriveItem> = graph.get_json(&absolute_url).await?;
     Ok(ListChildrenResult {
         items: page.value,
-        next: page.next_link.as_deref().map(encode_page_token),
+        next_url: page.next_link,
+        fetched_url: absolute_url,
     })
 }
 
@@ -168,9 +175,9 @@ pub async fn list_children_recursive(
     let mut out = Vec::new();
     let mut stack = vec![path.to_string()];
     while let Some(p) = stack.pop() {
-        let mut next: Option<String> = None;
+        let mut next_url: Option<String> = None;
         loop {
-            let page = list_children(graph, drive_id, &p, next.as_deref()).await?;
+            let page = list_children(graph, drive_id, &p, next_url.as_deref()).await?;
             for item in page.items {
                 if item.folder.is_some() {
                     let child_path = item_path(&p, &item.name);
@@ -178,8 +185,8 @@ pub async fn list_children_recursive(
                 }
                 out.push(item);
             }
-            next = page.next;
-            if next.is_none() {
+            next_url = page.next_url;
+            if next_url.is_none() {
                 break;
             }
         }
