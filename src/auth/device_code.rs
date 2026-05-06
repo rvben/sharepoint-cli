@@ -145,7 +145,7 @@ pub async fn request_device_code(
             Ok(e) => format!(
                 "device-code request failed ({status}): {}: {}",
                 e.error,
-                e.error_description.as_deref().unwrap_or_default()
+                redact_token_fields(e.error_description.as_deref().unwrap_or_default())
             ),
             Err(_) => {
                 tracing::debug!("device-code request failed ({status}): {body}");
@@ -177,7 +177,9 @@ async fn send_with_retry(
             Err(e) if attempt < MAX_TOKEN_RETRIES => {
                 // Connection-level failure (timeout, reset, DNS): retry.
                 let backoff = 2u64.pow(attempt);
-                tracing::debug!("token endpoint connection error (attempt {attempt}): {e}; retrying in {backoff}s");
+                tracing::debug!(
+                    "token endpoint connection error (attempt {attempt}): {e}; retrying in {backoff}s"
+                );
                 sleep(Duration::from_secs(backoff)).await;
                 attempt += 1;
                 continue;
@@ -300,13 +302,13 @@ pub async fn poll_for_token(
                     }
                     return Err(CliError::Auth(format!(
                         "access denied: {}",
-                        err.error_description.unwrap_or_default()
+                        redact_token_fields(err.error_description.as_deref().unwrap_or_default())
                     )));
                 }
                 other => {
                     return Err(CliError::Auth(format!(
                         "device-code polling failed: {other}: {}",
-                        err.error_description.unwrap_or_default()
+                        redact_token_fields(err.error_description.as_deref().unwrap_or_default())
                     )));
                 }
             },
@@ -365,7 +367,7 @@ pub async fn refresh(
         Ok(err) => Err(CliError::Auth(format!(
             "refresh failed: {}: {}",
             err.error,
-            err.error_description.unwrap_or_default()
+            redact_token_fields(err.error_description.as_deref().unwrap_or_default())
         ))),
         Err(_) => {
             tracing::debug!("refresh failed ({status}) with unparseable body: {body}");
