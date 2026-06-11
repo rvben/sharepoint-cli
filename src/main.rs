@@ -6,36 +6,285 @@ use sharepoint_cli::cli::{self, Cli};
 use sharepoint_cli::error::{CliError, exit_codes};
 use sharepoint_cli::output::{OutputConfig, OutputFormat};
 
-/// Rewrite argv before passing to clap so that `files download --output PATH`
-/// maps `--output` to `--path`.
+/// Rewrite argv before passing to clap so that `files download` path spellings
+/// (`--output PATH`, `--output=PATH`, `-o PATH`, `-oPATH`) are translated to
+/// their `--path` equivalents.
 ///
-/// `files download` predates the spec-conformant `--output FORMAT` global flag.
-/// Its `--output` means "destination file path" (or `-` for stdout), which
-/// conflicts with the global format selector. We rewrite it here so clap sees
-/// `--path` instead, keeping the `--output -` contract from the test suite
-/// while the global `--output auto|text|json` continues to work on all other
-/// subcommands.
+/// `files download` predates the spec-conformant `--output auto|text|json`
+/// global format flag. Its `-o`/`--output` means "destination file path" (or
+/// `-` for stdout), which conflicts with the global format selector. Clap does
+/// not allow a subcommand to shadow a global flag, so we rewrite the argv here
+/// before clap sees it.
+///
+/// Rules:
+/// - Only args that appear *after* the `download` token are rewritten.
+/// - Everything after a bare `--` separator is left untouched (those are
+///   positional pass-throughs that clap never interprets as flags).
+/// - The four clap-accepted spellings that are rewritten:
+///   - `--output`       (separate next-arg value)  → `--path`
+///   - `--output=VALUE` (equals-attached value)     → `--path=VALUE`
+///   - `-o`             (separate next-arg value)   → `--path`
+///   - `-oVALUE`        (attached short value)      → `--path=VALUE`
 fn rewrite_argv(args: impl Iterator<Item = std::ffi::OsString>) -> Vec<std::ffi::OsString> {
-    let mut result: Vec<std::ffi::OsString> = args.collect();
-    // Find the position of `files` followed by `download` (ignoring flags in
-    // between, which shouldn't exist in practice but guards against edge cases).
-    let files_pos = result.iter().position(|a| a == "files");
+    let args: Vec<std::ffi::OsString> = args.collect();
+
+    // Locate `files` followed immediately-or-eventually by `download`.
+    let files_pos = args.iter().position(|a| a == "files");
     let download_pos = files_pos.and_then(|fp| {
-        result[fp + 1..]
+        args[fp + 1..]
             .iter()
             .position(|a| a == "download")
             .map(|rel| fp + 1 + rel)
     });
-    if let Some(dl_pos) = download_pos {
-        // Rewrite `--output` that appears after `download` (and its REF arg)
-        // to `--path` so clap routes it to FilesCmd::Download.path.
-        for arg in &mut result[dl_pos + 1..] {
-            if arg == "--output" {
-                *arg = "--path".into();
-            }
+
+    let Some(dl_pos) = download_pos else {
+        return args;
+    };
+
+    let mut result: Vec<std::ffi::OsString> = Vec::with_capacity(args.len());
+    // Copy everything up to and including `download` unchanged.
+    result.extend_from_slice(&args[..=dl_pos]);
+
+    // Process the remainder, stopping rewrites once `--` is seen.
+    let mut past_separator = false;
+    let tail = &args[dl_pos + 1..];
+    let mut i = 0;
+    while i < tail.len() {
+        let arg = &tail[i];
+
+        if past_separator {
+            result.push(arg.clone());
+            i += 1;
+            continue;
         }
+
+        if arg == "--" {
+            past_separator = true;
+            result.push(arg.clone());
+            i += 1;
+            continue;
+        }
+
+        // `--output VALUE` (bare long flag, value is next arg)
+        if arg == "--output" {
+            result.push("--path".into());
+            i += 1;
+            continue;
+        }
+
+        // `--output=VALUE` (long flag with attached value)
+        if let Some(val) = arg.to_str().and_then(|s| s.strip_prefix("--output=")) {
+            result.push(format!("--path={val}").into());
+            i += 1;
+            continue;
+        }
+
+        // `-o VALUE` (short flag, value is next arg)
+        if arg == "-o" {
+            result.push("--path".into());
+            i += 1;
+            continue;
+        }
+
+        // `-oVALUE` (short flag with attached value, e.g. `-o-` or `-o/tmp/f`)
+        // Guard: `-o` alone is caught above; here `val` is non-empty.
+        // Clap treats any non-empty suffix of a value-taking short flag as the
+        // attached value, so `-o-` means value=`-` and `-o/tmp/f` means
+        // value=`/tmp/f`. We do the same without further restrictions.
+        if let Some(val) = arg
+            .to_str()
+            .and_then(|s| s.strip_prefix("-o"))
+            .filter(|val| !val.is_empty())
+        {
+            result.push(format!("--path={val}").into());
+            i += 1;
+            continue;
+        }
+
+        result.push(arg.clone());
+        i += 1;
     }
+
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rewrite_argv;
+
+    fn argv(args: &[&str]) -> Vec<std::ffi::OsString> {
+        args.iter().map(|s| s.into()).collect()
+    }
+
+    fn rewritten(args: &[&str]) -> Vec<String> {
+        rewrite_argv(argv(args).into_iter())
+            .into_iter()
+            .map(|a| a.into_string().unwrap())
+            .collect()
+    }
+
+    // --- download scope: all four spellings are rewritten ---
+
+    #[test]
+    fn download_long_flag_separate_value() {
+        // sharepoint files download REF --output -
+        let got = rewritten(&["sp", "files", "download", "REF", "--output", "-"]);
+        assert_eq!(got, ["sp", "files", "download", "REF", "--path", "-"]);
+    }
+
+    #[test]
+    fn download_long_flag_equals_value() {
+        // sharepoint files download REF --output=-
+        let got = rewritten(&["sp", "files", "download", "REF", "--output=-"]);
+        assert_eq!(got, ["sp", "files", "download", "REF", "--path=-"]);
+    }
+
+    #[test]
+    fn download_short_flag_separate_value() {
+        // sharepoint files download REF -o -
+        let got = rewritten(&["sp", "files", "download", "REF", "-o", "-"]);
+        assert_eq!(got, ["sp", "files", "download", "REF", "--path", "-"]);
+    }
+
+    #[test]
+    fn download_short_flag_attached_value() {
+        // sharepoint files download REF -o-
+        let got = rewritten(&["sp", "files", "download", "REF", "-o-"]);
+        assert_eq!(got, ["sp", "files", "download", "REF", "--path=-"]);
+    }
+
+    #[test]
+    fn download_short_flag_attached_path() {
+        // sharepoint files download REF -o/tmp/out.docx
+        let got = rewritten(&["sp", "files", "download", "REF", "-o/tmp/out.docx"]);
+        assert_eq!(
+            got,
+            ["sp", "files", "download", "REF", "--path=/tmp/out.docx"]
+        );
+    }
+
+    #[test]
+    fn download_long_flag_equals_real_path() {
+        let got = rewritten(&["sp", "files", "download", "REF", "--output=/tmp/file.xlsx"]);
+        assert_eq!(
+            got,
+            ["sp", "files", "download", "REF", "--path=/tmp/file.xlsx"]
+        );
+    }
+
+    // --- bare `--` stops rewrites ---
+
+    #[test]
+    fn download_after_separator_not_rewritten() {
+        let got = rewritten(&[
+            "sp",
+            "files",
+            "download",
+            "REF",
+            "--",
+            "--output",
+            "something",
+        ]);
+        assert_eq!(
+            got,
+            [
+                "sp",
+                "files",
+                "download",
+                "REF",
+                "--",
+                "--output",
+                "something"
+            ]
+        );
+    }
+
+    #[test]
+    fn download_before_separator_rewritten_after_not() {
+        let got = rewritten(&[
+            "sp", "files", "download", "REF", "--output", "/a", "--", "--output", "/b",
+        ]);
+        assert_eq!(
+            got,
+            [
+                "sp", "files", "download", "REF", "--path", "/a", "--", "--output", "/b"
+            ]
+        );
+    }
+
+    // --- non-download subcommands: no rewrite ---
+
+    #[test]
+    fn files_stat_short_flag_not_rewritten() {
+        // sharepoint files stat REF -o json  (format selector, must stay)
+        let got = rewritten(&["sp", "files", "stat", "REF", "-o", "json"]);
+        assert_eq!(got, ["sp", "files", "stat", "REF", "-o", "json"]);
+    }
+
+    #[test]
+    fn files_ls_output_not_rewritten() {
+        let got = rewritten(&["sp", "files", "ls", "REF", "--output", "text"]);
+        assert_eq!(got, ["sp", "files", "ls", "REF", "--output", "text"]);
+    }
+
+    #[test]
+    fn global_output_before_subcommand_not_rewritten() {
+        // sharepoint --output json files stat REF
+        let got = rewritten(&["sp", "--output", "json", "files", "stat", "REF"]);
+        assert_eq!(got, ["sp", "--output", "json", "files", "stat", "REF"]);
+    }
+
+    #[test]
+    fn global_output_before_files_download_not_rewritten() {
+        // sharepoint --output json files download REF  (format before, path after)
+        let got = rewritten(&[
+            "sp", "--output", "json", "files", "download", "REF", "--output", "-",
+        ]);
+        assert_eq!(
+            got,
+            [
+                "sp", "--output", "json", "files", "download", "REF", "--path", "-"
+            ]
+        );
+    }
+
+    #[test]
+    fn auth_status_not_rewritten() {
+        let got = rewritten(&["sp", "auth", "status", "-o", "json"]);
+        assert_eq!(got, ["sp", "auth", "status", "-o", "json"]);
+    }
+
+    #[test]
+    fn no_files_subcommand_not_rewritten() {
+        let got = rewritten(&["sp", "sites", "list", "--output", "json"]);
+        assert_eq!(got, ["sp", "sites", "list", "--output", "json"]);
+    }
+
+    #[test]
+    fn overwrite_flag_after_download_not_rewritten() {
+        // --overwrite must pass through unchanged
+        let got = rewritten(&[
+            "sp",
+            "files",
+            "download",
+            "REF",
+            "--output",
+            "/tmp/f",
+            "--overwrite",
+        ]);
+        assert_eq!(
+            got,
+            [
+                "sp",
+                "files",
+                "download",
+                "REF",
+                "--path",
+                "/tmp/f",
+                "--overwrite"
+            ]
+        );
+    }
 }
 
 #[tokio::main]
