@@ -12,7 +12,7 @@ use crate::commands::auth;
 use crate::config;
 use crate::error::{CliError, Result};
 
-pub async fn run(rt: &Runtime, _yes: bool) -> Result<()> {
+pub async fn run(rt: &Runtime) -> Result<()> {
     if rt.out.quiet {
         return Err(CliError::Input(
             "init is interactive and cannot run with --quiet".into(),

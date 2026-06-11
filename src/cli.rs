@@ -49,11 +49,7 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Interactive setup + first device-code login.
-    Init {
-        /// Skip the final confirmation prompt and proceed with the provided values.
-        #[arg(long)]
-        yes: bool,
-    },
+    Init,
     /// Sub-commands: login, logout, status.
     #[command(subcommand)]
     Auth(AuthCmd),
@@ -234,7 +230,7 @@ pub async fn run(cli: Cli) -> Result<()> {
     let rt = Runtime::build(&cli)?;
     match cli.command {
         Command::Schema => unreachable!(),
-        Command::Init { yes } => crate::commands::init::run(&rt, yes).await,
+        Command::Init => crate::commands::init::run(&rt).await,
         Command::Auth(sub) => crate::commands::auth::run(&rt, sub).await,
         Command::Config(sub) => crate::commands::config::run(&rt, sub).await,
         Command::Sites(sub) => crate::commands::sites::run(&rt, sub).await,

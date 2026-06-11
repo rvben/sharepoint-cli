@@ -118,19 +118,19 @@ pub fn run() -> crate::error::Result<()> {
                 "name": "init",
                 "description": "Interactive setup: write a config profile and run the first device-code login.",
                 "mutating": true,
+                "args": []
+            },
+            {
+                "name": "sites use",
+                "description": "Set the default site for the active profile. Writes the config file; requires confirmation in non-TTY contexts.",
+                "mutating": true,
                 "args": [
-                    {
-                        "name": "--yes",
-                        "type": "boolean",
-                        "required": false,
-                        "default": false,
-                        "description": "Skip the final confirmation prompt and proceed with the provided values."
-                    }
+                    {"name": "site", "type": "string", "required": true, "description": "Site name or URL."},
+                    {"name": "--yes", "type": "boolean", "required": false, "default": false, "description": "Skip confirmation prompt (required when stdin is not a TTY)."}
                 ],
                 "output_fields": [
-                    {"name": "username", "type": "string"},
-                    {"name": "name", "type": "string"},
-                    {"name": "tenant_id", "type": "string"}
+                    {"name": "profile", "type": "string"},
+                    {"name": "default_site", "type": "string"}
                 ]
             },
             {
