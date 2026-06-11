@@ -4,7 +4,7 @@ use clap::Parser;
 
 use sharepoint_cli::cli::{self, Cli};
 use sharepoint_cli::error::{CliError, exit_codes};
-use sharepoint_cli::output::OutputConfig;
+use sharepoint_cli::output::{OutputConfig, OutputFormat};
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -24,9 +24,8 @@ async fn main() -> ExitCode {
                 let code: u8 = if e.use_stderr() { 2 } else { 0 };
                 return ExitCode::from(code);
             }
-            // Real parse errors go through the JSON-error-on-stdout contract so
-            // agents can parse a single stream regardless of TTY state.
-            let out = OutputConfig::new(false, false);
+            // Real parse errors use auto-format (JSON when piped).
+            let out = OutputConfig::new(OutputFormat::Auto, false);
             let msg = e.to_string();
             let first_line = msg
                 .lines()
@@ -38,7 +37,7 @@ async fn main() -> ExitCode {
             return ExitCode::from(exit as u8);
         }
     };
-    let out = OutputConfig::new(cli.json, cli.quiet);
+    let out = OutputConfig::new(cli.output, cli.quiet);
     match cli::run(cli).await {
         Ok(()) => ExitCode::from(exit_codes::SUCCESS as u8),
         Err(err) => ExitCode::from(out.render_error(&err) as u8),

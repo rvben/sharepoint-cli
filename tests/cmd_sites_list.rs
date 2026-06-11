@@ -57,7 +57,7 @@ async fn sites_list_returns_followed_sites() {
         .env("SHAREPOINT_CLIENT_ID", "client-1")
         .env("SHAREPOINT_ACCESS_TOKEN", "FAKE-TOKEN")
         .env("MICROSOFT_GRAPH_ENDPOINT", server.uri())
-        .args(["--json", "sites", "list"])
+        .args(["--output", "json", "sites", "list"])
         .assert()
         .success()
         .stdout(contains("Marketing"))

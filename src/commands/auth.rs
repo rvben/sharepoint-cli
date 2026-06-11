@@ -11,7 +11,11 @@ pub async fn run(rt: &Runtime, cmd: AuthCmd) -> Result<()> {
     match cmd {
         AuthCmd::Login => login(rt).await,
         AuthCmd::Logout => logout(rt).await,
-        AuthCmd::Status => status(rt).await,
+        AuthCmd::Status {
+            limit,
+            page,
+            fields,
+        } => status(rt, limit, page.as_deref(), &fields).await,
     }
 }
 
@@ -116,36 +120,53 @@ async fn logout(rt: &Runtime) -> Result<()> {
     Ok(())
 }
 
-async fn status(rt: &Runtime) -> Result<()> {
+async fn status(rt: &Runtime, limit: usize, _page: Option<&str>, fields: &[String]) -> Result<()> {
     let cache = token_cache::load(&rt.cache_path)?;
+
+    // Build the full account list.
+    let mut all_accounts: Vec<_> = cache
+        .entries
+        .iter()
+        .map(|(key, entry)| {
+            let mut obj = serde_json::json!({
+                "key": key,
+                "username": entry.account.username,
+                "name": entry.account.name,
+                "tenant_id": entry.account.tenant_id,
+                "oid": entry.account.oid,
+                "expires_at": entry.access_token_expires_at.to_rfc3339(),
+                "scopes": entry.scopes,
+            });
+            if !fields.is_empty()
+                && let serde_json::Value::Object(ref mut map) = obj
+            {
+                map.retain(|k, _| fields.iter().any(|f| f == k));
+            }
+            obj
+        })
+        .collect();
+
+    let total = all_accounts.len();
+    all_accounts.truncate(limit);
+
     if rt.out.json {
-        let accounts: Vec<_> = cache
-            .entries
-            .iter()
-            .map(|(key, entry)| {
-                serde_json::json!({
-                    "key": key,
-                    "username": entry.account.username,
-                    "name": entry.account.name,
-                    "tenant_id": entry.account.tenant_id,
-                    "oid": entry.account.oid,
-                    "expires_at": entry.access_token_expires_at.to_rfc3339(),
-                    "scopes": entry.scopes,
-                })
-            })
-            .collect();
-        rt.out
-            .print_json(&serde_json::json!({"accounts": accounts}));
-    } else if cache.entries.is_empty() {
-        rt.out
-            .print_message("No cached accounts. Run `sharepoint auth login`.");
+        rt.out.print_json(&serde_json::json!({
+            "total": total,
+            "next": serde_json::Value::Null,
+            "items": all_accounts,
+        }));
     } else {
-        for entry in cache.entries.values() {
-            rt.out.print_data(&format!(
-                "{:30}  expires {}",
-                entry.account.username,
-                entry.access_token_expires_at.to_rfc3339()
-            ));
+        // Always emit at least the column header so stdout is non-empty in text mode.
+        rt.out
+            .print_data(&format!("{:30}  {}", "ACCOUNT", "EXPIRES"));
+        for obj in &all_accounts {
+            let username = obj["username"].as_str().unwrap_or("");
+            let expires = obj["expires_at"].as_str().unwrap_or("");
+            rt.out.print_data(&format!("{:30}  {}", username, expires));
+        }
+        if total == 0 {
+            rt.out
+                .print_message("No cached accounts. Run `sharepoint auth login`.");
         }
     }
     Ok(())

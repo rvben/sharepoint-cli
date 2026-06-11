@@ -1,7 +1,7 @@
 use assert_cmd::Command;
 
 #[test]
-fn clap_error_renders_as_json_on_stdout() {
+fn clap_error_renders_structured_error_on_stderr() {
     let output = Command::cargo_bin("sharepoint")
         .unwrap()
         .env_clear()
@@ -10,12 +10,20 @@ fn clap_error_renders_as_json_on_stdout() {
         .assert()
         .code(2)
         .get_output()
-        .stdout
+        .stderr
         .clone();
 
-    let v: serde_json::Value = serde_json::from_slice(&output).expect("stdout must be valid JSON");
-    assert_eq!(v["error"]["code"], "input");
-    assert_eq!(v["error"]["exit"], 2);
+    // The last non-empty line of stderr must be the JSON error envelope.
+    let stderr_text = String::from_utf8_lossy(&output);
+    let last_json_line = stderr_text
+        .lines()
+        .rfind(|l| l.trim_start().starts_with('{'))
+        .expect("stderr must contain a JSON line");
+    let v: serde_json::Value =
+        serde_json::from_str(last_json_line).expect("last stderr JSON line must be valid JSON");
+
+    assert_eq!(v["error"]["kind"], "input");
+    assert_eq!(v["error"]["exit_code"], 2);
     let message = v["error"]["message"]
         .as_str()
         .expect("error.message must be a string");

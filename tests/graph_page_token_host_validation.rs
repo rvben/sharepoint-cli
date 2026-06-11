@@ -28,8 +28,9 @@ fn page_token_pointing_at_attacker_host_is_rejected() {
             "11111111-1111-1111-1111-111111111111",
         )
         .env("SHAREPOINT_CLIENT_ID", "client-1")
-        .args(["--json", "sites", "list", "--page", &token])
+        .args(["--output", "json", "sites", "list", "--page", &token])
         .assert()
         .code(2)
-        .stdout(contains("host"));
+        // Per the spec, errors go to stderr; the JSON envelope is the last line.
+        .stderr(contains("host"));
 }

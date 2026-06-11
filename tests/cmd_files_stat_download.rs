@@ -75,7 +75,8 @@ async fn files_stat_includes_download_url() {
         .env("SHAREPOINT_ACCESS_TOKEN", "FAKE")
         .env("MICROSOFT_GRAPH_ENDPOINT", server.uri())
         .args([
-            "--json",
+            "--output",
+            "json",
             "files",
             "stat",
             "https://contoso.sharepoint.com/sites/Marketing/Documents/Q4-plan.pptx",

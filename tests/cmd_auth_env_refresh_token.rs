@@ -54,7 +54,7 @@ async fn env_refresh_token_bootstraps_auth_when_no_cache() {
         .env("SHAREPOINT_REFRESH_TOKEN", "ENV-RT")
         .env("MICROSOFT_LOGIN_ENDPOINT", login_server.uri())
         .env("MICROSOFT_GRAPH_ENDPOINT", graph_server.uri())
-        .args(["--json", "sites", "list"])
+        .args(["--output", "json", "sites", "list"])
         .assert()
         .success()
         .stdout(contains("\"items\""));
@@ -90,7 +90,7 @@ async fn env_refresh_token_fails_with_auth_error_on_invalid_grant() {
         .env("SHAREPOINT_REFRESH_TOKEN", "REVOKED-RT")
         .env("MICROSOFT_LOGIN_ENDPOINT", login_server.uri())
         .env("MICROSOFT_GRAPH_ENDPOINT", "https://graph.example.test")
-        .args(["--json", "sites", "list"])
+        .args(["--output", "json", "sites", "list"])
         .assert()
         .failure()
         .code(3);

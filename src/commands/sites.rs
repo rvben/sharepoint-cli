@@ -1,5 +1,7 @@
 //! `sharepoint sites list | use`
 
+use std::io::IsTerminal;
+
 use crate::auth::AuthContext;
 use crate::cli::{Runtime, SitesCmd};
 use crate::config;
@@ -13,8 +15,9 @@ pub async fn run(rt: &Runtime, cmd: SitesCmd) -> Result<()> {
             limit,
             all,
             page,
-        } => list(rt, query.as_deref(), limit, all, page.as_deref()).await,
-        SitesCmd::Use { site } => use_site(rt, &site).await,
+            fields,
+        } => list(rt, query.as_deref(), limit, all, page.as_deref(), &fields).await,
+        SitesCmd::Use { site, yes } => use_site(rt, &site, yes).await,
     }
 }
 
@@ -24,6 +27,7 @@ async fn list(
     limit: usize,
     all: bool,
     page: Option<&str>,
+    fields: &[String],
 ) -> Result<()> {
     let auth = AuthContext::new(rt.cfg.clone(), rt.cache_path.clone());
     let graph = GraphClient::new(auth);
@@ -84,11 +88,14 @@ async fn list(
         let json_items: Vec<_> = items
             .iter()
             .map(|s| {
-                serde_json::json!({
-                    "id": s.id,
-                    "name": s.display_name,
-                    "url": s.web_url,
-                })
+                filter_fields(
+                    serde_json::json!({
+                        "id": s.id,
+                        "name": s.display_name,
+                        "url": s.web_url,
+                    }),
+                    fields,
+                )
             })
             .collect();
         rt.out.print_json(&serde_json::json!({
@@ -108,11 +115,17 @@ async fn list(
     Ok(())
 }
 
-async fn use_site(rt: &Runtime, value: &str) -> Result<()> {
+async fn use_site(rt: &Runtime, value: &str, yes: bool) -> Result<()> {
     if rt.cfg.read_only {
         return Err(CliError::ReadOnly(
             "sites use modifies the config file; not allowed in read-only mode".into(),
         ));
+    }
+    // Require --yes when stdin is not a TTY (no interactive confirmation possible).
+    if !yes && !std::io::stdin().is_terminal() {
+        return Err(CliError::ConfirmationRequired(format!(
+            "setting the default site to '{value}' requires confirmation; re-run with --yes to confirm"
+        )));
     }
     let mut file = rt.config_file.clone();
     let entry = file.profile.entry(rt.cfg.profile_name.clone()).or_default();
@@ -129,4 +142,15 @@ async fn use_site(rt: &Runtime, value: &str) -> Result<()> {
         }));
     }
     Ok(())
+}
+
+/// Filter a JSON object to only the specified fields; pass through if `fields` is empty.
+fn filter_fields(mut value: serde_json::Value, fields: &[String]) -> serde_json::Value {
+    if fields.is_empty() {
+        return value;
+    }
+    if let serde_json::Value::Object(ref mut map) = value {
+        map.retain(|k, _| fields.iter().any(|f| f == k));
+    }
+    value
 }

@@ -88,7 +88,8 @@ async fn files_ls_returns_items_at_drive_root() {
         .env("SHAREPOINT_ACCESS_TOKEN", "FAKE")
         .env("MICROSOFT_GRAPH_ENDPOINT", server.uri())
         .args([
-            "--json",
+            "--output",
+            "json",
             "files",
             "ls",
             "https://contoso.sharepoint.com/sites/Marketing/Documents",

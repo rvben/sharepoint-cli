@@ -18,7 +18,7 @@ fn auth_login_errors_when_client_id_is_missing() {
         .args(["auth", "login"])
         .assert()
         .code(3)
-        .stdout(contains("client_id is required"));
+        .stderr(contains("client_id is required"));
 }
 
 #[test]
@@ -38,5 +38,5 @@ fn init_errors_when_client_id_prompt_is_blank() {
         .write_stdin("contoso\n\n")
         .assert()
         .failure()
-        .stdout(contains("client_id is required"));
+        .stderr(contains("client_id is required"));
 }

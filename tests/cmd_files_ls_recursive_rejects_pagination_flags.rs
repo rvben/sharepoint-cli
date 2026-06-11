@@ -17,7 +17,8 @@ fn base() -> Command {
 fn recursive_with_limit_rejected() {
     base()
         .args([
-            "--json",
+            "--output",
+            "json",
             "files",
             "ls",
             "--recursive",
@@ -27,23 +28,33 @@ fn recursive_with_limit_rejected() {
         ])
         .assert()
         .code(2)
-        .stdout(contains("recursive"));
+        // Per the spec, errors go to stderr; the JSON envelope is the last line.
+        .stderr(contains("recursive"));
 }
 
 #[test]
 fn recursive_with_all_rejected() {
     base()
-        .args(["--json", "files", "ls", "--recursive", "--all", "Lib"])
+        .args([
+            "--output",
+            "json",
+            "files",
+            "ls",
+            "--recursive",
+            "--all",
+            "Lib",
+        ])
         .assert()
         .code(2)
-        .stdout(contains("recursive"));
+        .stderr(contains("recursive"));
 }
 
 #[test]
 fn recursive_with_page_rejected() {
     base()
         .args([
-            "--json",
+            "--output",
+            "json",
             "files",
             "ls",
             "--recursive",
@@ -53,7 +64,7 @@ fn recursive_with_page_rejected() {
         ])
         .assert()
         .code(2)
-        .stdout(contains("recursive"));
+        .stderr(contains("recursive"));
 }
 
 #[test]
@@ -62,7 +73,8 @@ fn recursive_with_limit_200_rejected() {
     // supplied it as Option<usize>::Some(200), it must still be rejected.
     base()
         .args([
-            "--json",
+            "--output",
+            "json",
             "files",
             "ls",
             "--recursive",
@@ -72,5 +84,5 @@ fn recursive_with_limit_200_rejected() {
         ])
         .assert()
         .code(2)
-        .stdout(contains("recursive"));
+        .stderr(contains("recursive"));
 }

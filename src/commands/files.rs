@@ -19,6 +19,14 @@ struct Resolved {
     parsed: ParsedRef,
 }
 
+/// Pagination options shared by list-style commands.
+struct PageOpts<'a> {
+    limit: usize,
+    all: bool,
+    page: Option<&'a str>,
+    fields: &'a [String],
+}
+
 /// Parse `reference`, build auth+client, resolve site and drive.
 async fn resolve(rt: &Runtime, reference: &str) -> Result<(GraphClient, Resolved)> {
     let default_site_set = rt.cfg.default_site.is_some();
@@ -61,15 +69,27 @@ pub async fn run(rt: &Runtime, cmd: FilesCmd) -> Result<()> {
             limit,
             all,
             page,
-        } => ls(rt, &reference, recursive, limit, all, page.as_deref()).await,
+            fields,
+        } => {
+            ls(
+                rt,
+                &reference,
+                recursive,
+                limit,
+                all,
+                page.as_deref(),
+                &fields,
+            )
+            .await
+        }
 
         FilesCmd::Stat { reference } => stat(rt, &reference).await,
 
         FilesCmd::Download {
             reference,
-            output,
+            path,
             overwrite,
-        } => download(rt, &reference, output.as_deref(), overwrite).await,
+        } => download(rt, &reference, path.as_deref(), overwrite).await,
 
         FilesCmd::Find {
             reference,
@@ -78,15 +98,19 @@ pub async fn run(rt: &Runtime, cmd: FilesCmd) -> Result<()> {
             limit,
             all,
             page,
+            fields,
         } => {
             find(
                 rt,
                 &reference,
                 query.as_deref(),
                 name.as_deref(),
-                limit,
-                all,
-                page.as_deref(),
+                PageOpts {
+                    limit,
+                    all,
+                    page: page.as_deref(),
+                    fields: &fields,
+                },
             )
             .await
         }
@@ -102,6 +126,7 @@ async fn ls(
     limit: Option<usize>,
     all: bool,
     page: Option<&str>,
+    fields: &[String],
 ) -> Result<()> {
     if recursive && (limit.is_some() || all || page.is_some()) {
         return Err(CliError::Input(
@@ -117,7 +142,7 @@ async fn ls(
         if rt.out.json {
             let json_items: Vec<_> = items
                 .iter()
-                .map(|it| canonical_json(it, &r.site, &r.drive, false))
+                .map(|it| filter_fields(canonical_json(it, &r.site, &r.drive, false), fields))
                 .collect();
             rt.out.print_json(&serde_json::json!({
                 "total": json_items.len(),
@@ -202,7 +227,7 @@ async fn ls(
     if rt.out.json {
         let json_items: Vec<_> = items
             .iter()
-            .map(|it| canonical_json(it, &r.site, &r.drive, false))
+            .map(|it| filter_fields(canonical_json(it, &r.site, &r.drive, false), fields))
             .collect();
         rt.out.print_json(&serde_json::json!({
             "total": json_items.len(),
@@ -324,10 +349,14 @@ async fn find(
     reference: &str,
     query: Option<&str>,
     name_glob: Option<&str>,
-    limit: usize,
-    all: bool,
-    page: Option<&str>,
+    opts: PageOpts<'_>,
 ) -> Result<()> {
+    let PageOpts {
+        limit,
+        all,
+        page,
+        fields,
+    } = opts;
     let (graph, r) = resolve(rt, reference).await?;
     // Permissive default query when only --name is given (Graph requires a query).
     let q = query.unwrap_or("*");
@@ -390,7 +419,7 @@ async fn find(
     if rt.out.json {
         let json_items: Vec<_> = items
             .iter()
-            .map(|it| canonical_json(it, &r.site, &r.drive, false))
+            .map(|it| filter_fields(canonical_json(it, &r.site, &r.drive, false), fields))
             .collect();
         rt.out.print_json(&serde_json::json!({
             "total": total,
@@ -404,4 +433,16 @@ async fn find(
         rt.out.print_message(&format!("({total} match(es))"));
     }
     Ok(())
+}
+
+/// Filter a JSON object to only include the specified fields.
+/// When `fields` is empty, return the object unchanged.
+fn filter_fields(mut value: serde_json::Value, fields: &[String]) -> serde_json::Value {
+    if fields.is_empty() {
+        return value;
+    }
+    if let serde_json::Value::Object(ref mut map) = value {
+        map.retain(|k, _| fields.iter().any(|f| f == k));
+    }
+    value
 }

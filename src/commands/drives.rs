@@ -8,11 +8,22 @@ use crate::reference::SiteRef;
 
 pub async fn run(rt: &Runtime, cmd: DrivesCmd) -> Result<()> {
     match cmd {
-        DrivesCmd::List { site, limit, all } => list(rt, &site, limit, all).await,
+        DrivesCmd::List {
+            site,
+            limit,
+            all,
+            fields,
+        } => list(rt, &site, limit, all, &fields).await,
     }
 }
 
-async fn list(rt: &Runtime, site_input: &str, limit: usize, all: bool) -> Result<()> {
+async fn list(
+    rt: &Runtime,
+    site_input: &str,
+    limit: usize,
+    all: bool,
+    fields: &[String],
+) -> Result<()> {
     let auth = AuthContext::new(rt.cfg.clone(), rt.cache_path.clone());
     let graph = GraphClient::new(auth);
 
@@ -54,12 +65,15 @@ async fn list(rt: &Runtime, site_input: &str, limit: usize, all: bool) -> Result
         let items: Vec<_> = all_drives
             .iter()
             .map(|d| {
-                serde_json::json!({
-                    "id": d.id,
-                    "name": d.name,
-                    "drive_type": d.drive_type,
-                    "site": {"id": site.id, "name": site.display_name, "url": site.web_url},
-                })
+                filter_fields(
+                    serde_json::json!({
+                        "id": d.id,
+                        "name": d.name,
+                        "drive_type": d.drive_type,
+                        "site": {"id": site.id, "name": site.display_name, "url": site.web_url},
+                    }),
+                    fields,
+                )
             })
             .collect();
         rt.out.print_json(&serde_json::json!({
@@ -76,4 +90,15 @@ async fn list(rt: &Runtime, site_input: &str, limit: usize, all: bool) -> Result
             .print_message(&format!("({total} drive(s) on {})", site.display_name));
     }
     Ok(())
+}
+
+/// Filter a JSON object to only the specified fields; pass through if `fields` is empty.
+fn filter_fields(mut value: serde_json::Value, fields: &[String]) -> serde_json::Value {
+    if fields.is_empty() {
+        return value;
+    }
+    if let serde_json::Value::Object(ref mut map) = value {
+        map.retain(|k, _| fields.iter().any(|f| f == k));
+    }
+    value
 }

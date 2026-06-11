@@ -112,7 +112,7 @@ async fn files_ls_limit_mid_page_emits_cursor() {
     seed_cache(dir.path());
 
     let out = cli(&server, &dir)
-        .args(["--json", "files", "ls", "--limit", "2", SITE_REF])
+        .args(["--output", "json", "files", "ls", "--limit", "2", SITE_REF])
         .assert()
         .success()
         .get_output()
@@ -146,7 +146,7 @@ async fn files_ls_limit_mid_page_resumes_correctly() {
 
     // First request: --limit 2 → get file1 + file2, cursor points at page1 skip=2.
     let first_out = cli(&server, &dir)
-        .args(["--json", "files", "ls", "--limit", "2", SITE_REF])
+        .args(["--output", "json", "files", "ls", "--limit", "2", SITE_REF])
         .assert()
         .success()
         .get_output()
@@ -167,7 +167,7 @@ async fn files_ls_limit_mid_page_resumes_correctly() {
     // Should yield file3 (remaining from page 1) + file4/file5/file6 (page 2) → 4 items.
     let second_out = cli(&server, &dir)
         .args([
-            "--json", "files", "ls", "--limit", "4", "--page", token, SITE_REF,
+            "--output", "json", "files", "ls", "--limit", "4", "--page", token, SITE_REF,
         ])
         .assert()
         .success()
@@ -205,7 +205,7 @@ async fn files_ls_all_follows_next_link() {
     seed_cache(dir.path());
 
     let out = cli(&server, &dir)
-        .args(["--json", "files", "ls", "--all", SITE_REF])
+        .args(["--output", "json", "files", "ls", "--all", SITE_REF])
         .assert()
         .success()
         .get_output()

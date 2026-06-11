@@ -10,6 +10,10 @@ pub enum CliError {
     Auth(String),
     /// Read-only mode blocked a write (exit 2).
     ReadOnly(String),
+    /// Destructive command refused without --yes (exit 2).
+    ConfirmationRequired(String),
+    /// Resource exists with conflicting configuration (exit 7).
+    Conflict(String),
     /// Site, library, or item not found (exit 4).
     NotFound(String),
     /// Graph API returned a non-2xx error (exit 5).
@@ -28,6 +32,8 @@ impl fmt::Display for CliError {
             CliError::Input(m) => write!(f, "{m}"),
             CliError::Auth(m) => write!(f, "{m}"),
             CliError::ReadOnly(m) => write!(f, "{m}"),
+            CliError::ConfirmationRequired(m) => write!(f, "{m}"),
+            CliError::Conflict(m) => write!(f, "{m}"),
             CliError::NotFound(m) => write!(f, "{m}"),
             CliError::Api { status, message } => write!(f, "Graph API {status}: {message}"),
             CliError::RateLimit => write!(f, "rate limited by Microsoft Graph"),
@@ -65,16 +71,36 @@ pub mod exit_codes {
     pub const NOT_FOUND: i32 = 4;
     pub const API: i32 = 5;
     pub const RATE_LIMIT: i32 = 6;
+    pub const CONFLICT: i32 = 7;
 }
 
 pub fn exit_code_for(err: &CliError) -> i32 {
     match err {
-        CliError::Input(_) | CliError::ReadOnly(_) => exit_codes::INPUT,
+        CliError::Input(_) | CliError::ReadOnly(_) | CliError::ConfirmationRequired(_) => {
+            exit_codes::INPUT
+        }
         CliError::Auth(_) => exit_codes::AUTH,
         CliError::NotFound(_) => exit_codes::NOT_FOUND,
         CliError::Api { .. } => exit_codes::API,
         CliError::RateLimit => exit_codes::RATE_LIMIT,
+        CliError::Conflict(_) => exit_codes::CONFLICT,
         CliError::Http(_) | CliError::Other(_) => exit_codes::GENERAL,
+    }
+}
+
+/// Stable kind string for the structured error envelope.
+pub fn kind_for(err: &CliError) -> &'static str {
+    match err {
+        CliError::Input(_) => "input",
+        CliError::Auth(_) => "auth",
+        CliError::ReadOnly(_) => "read_only",
+        CliError::ConfirmationRequired(_) => "confirmation_required",
+        CliError::Conflict(_) => "conflict",
+        CliError::NotFound(_) => "not_found",
+        CliError::Api { .. } => "api",
+        CliError::RateLimit => "rate_limit",
+        CliError::Http(_) => "http",
+        CliError::Other(_) => "other",
     }
 }
 
@@ -131,11 +157,47 @@ mod tests {
     }
 
     #[test]
+    fn confirmation_required_maps_to_exit_2() {
+        assert_eq!(
+            exit_code_for(&CliError::ConfirmationRequired("x".into())),
+            2
+        );
+    }
+
+    #[test]
+    fn conflict_maps_to_exit_7() {
+        assert_eq!(exit_code_for(&CliError::Conflict("x".into())), 7);
+    }
+
+    #[test]
     fn display_includes_status_for_api() {
         let e = CliError::Api {
             status: 404,
             message: "not found".into(),
         };
         assert_eq!(format!("{e}"), "Graph API 404: not found");
+    }
+
+    #[test]
+    fn kind_for_covers_all_variants() {
+        assert_eq!(kind_for(&CliError::Input("x".into())), "input");
+        assert_eq!(kind_for(&CliError::Auth("x".into())), "auth");
+        assert_eq!(kind_for(&CliError::ReadOnly("x".into())), "read_only");
+        assert_eq!(
+            kind_for(&CliError::ConfirmationRequired("x".into())),
+            "confirmation_required"
+        );
+        assert_eq!(kind_for(&CliError::Conflict("x".into())), "conflict");
+        assert_eq!(kind_for(&CliError::NotFound("x".into())), "not_found");
+        assert_eq!(
+            kind_for(&CliError::Api {
+                status: 500,
+                message: "x".into()
+            }),
+            "api"
+        );
+        assert_eq!(kind_for(&CliError::RateLimit), "rate_limit");
+        assert_eq!(kind_for(&CliError::Http("x".into())), "http");
+        assert_eq!(kind_for(&CliError::Other("x".into())), "other");
     }
 }

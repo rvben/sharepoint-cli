@@ -86,7 +86,8 @@ async fn files_find_returns_matches_with_query() {
         .env("SHAREPOINT_ACCESS_TOKEN", "FAKE")
         .env("MICROSOFT_GRAPH_ENDPOINT", server.uri())
         .args([
-            "--json",
+            "--output",
+            "json",
             "files",
             "find",
             "https://contoso.sharepoint.com/sites/Marketing/Documents",
@@ -148,7 +149,8 @@ async fn files_find_filters_by_glob() {
         .env("SHAREPOINT_ACCESS_TOKEN", "FAKE")
         .env("MICROSOFT_GRAPH_ENDPOINT", server.uri())
         .args([
-            "--json",
+            "--output",
+            "json",
             "files",
             "find",
             "https://contoso.sharepoint.com/sites/Marketing/Documents",

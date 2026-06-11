@@ -46,7 +46,7 @@ fn auth_logout_removes_matching_tenant_entries() {
         .env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")
-        .args(["--json", "auth", "logout"])
+        .args(["--output", "json", "auth", "logout"])
         .assert()
         .success()
         .stdout(contains("\"removed\": 1"));
@@ -88,7 +88,7 @@ fn auth_logout_is_no_op_when_no_matching_entry() {
         .env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")
-        .args(["--json", "auth", "logout"])
+        .args(["--output", "json", "auth", "logout"])
         .assert()
         .success()
         .stdout(contains("\"removed\": 0"));

@@ -15,7 +15,7 @@ fn config_path_prints_path() {
 fn config_show_has_exact_key_set() {
     let out = Command::cargo_bin("sharepoint")
         .unwrap()
-        .args(["--json", "config", "show"])
+        .args(["--output", "json", "config", "show"])
         .output()
         .unwrap();
     assert!(

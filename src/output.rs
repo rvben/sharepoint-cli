@@ -1,11 +1,11 @@
 //! Output configuration: TTY detection, JSON/table/quiet modes,
-//! color, and the JSON-error-on-stdout contract.
+//! color, and the structured error contract.
 
 use std::io::IsTerminal;
 
 use serde_json::json;
 
-use crate::error::{CliError, exit_code_for};
+use crate::error::{CliError, exit_code_for, kind_for};
 
 pub fn use_color() -> bool {
     std::env::var_os("NO_COLOR").is_none() && std::io::stdout().is_terminal()
@@ -17,16 +17,35 @@ pub fn terminal_width() -> usize {
         .unwrap_or(80)
 }
 
+/// Three-valued output format flag (mirrors `--output auto|text|json`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum OutputFormat {
+    /// JSON when stdout is not a TTY; human-friendly text when it is.
+    Auto,
+    /// Always human-friendly text (no JSON even when piped).
+    Text,
+    /// Always JSON.
+    Json,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct OutputConfig {
+    /// Whether to emit JSON on stdout for data output.
     pub json: bool,
     pub quiet: bool,
 }
 
 impl OutputConfig {
-    /// Build from `--json` / `--quiet` flags. JSON is forced on when stdout is not a TTY.
-    pub fn new(json_flag: bool, quiet: bool) -> Self {
-        let json = json_flag || !std::io::stdout().is_terminal();
+    /// Build from the `--output` enum and `--quiet` flag.
+    ///
+    /// `--output auto` (the default) emits JSON when stdout is not a TTY.
+    /// An explicit `text` or `json` always wins.
+    pub fn new(format: OutputFormat, quiet: bool) -> Self {
+        let json = match format {
+            OutputFormat::Json => true,
+            OutputFormat::Text => false,
+            OutputFormat::Auto => !std::io::stdout().is_terminal(),
+        };
         Self { json, quiet }
     }
 
@@ -61,36 +80,32 @@ impl OutputConfig {
         );
     }
 
-    /// Render an error per the spec contract:
-    /// - JSON mode: emit `{"error": {...}}` to **stdout** (deliberate divergence
-    ///   from jira-cli — agents parsing stdout get a structured error).
-    /// - Plain mode: emit the message to **stderr**.
+    /// Render a structured error.
+    ///
+    /// The error envelope `{"error": {"kind": "...", "message": "...",
+    /// "exit_code": N}}` is always written as a single JSON line to **stderr**,
+    /// so that consumers can extract it mechanically regardless of output mode.
+    /// In plain-text mode we also print a human-readable prefix on stderr.
     ///
     /// Returns the exit code the caller should use.
     pub fn render_error(&self, err: &CliError) -> i32 {
         let exit = exit_code_for(err);
-        if self.json {
-            let code = match err {
-                CliError::Input(_) => "input",
-                CliError::Auth(_) => "auth",
-                CliError::ReadOnly(_) => "read_only",
-                CliError::NotFound(_) => "not_found",
-                CliError::Api { .. } => "api",
-                CliError::RateLimit => "rate_limit",
-                CliError::Http(_) => "http",
-                CliError::Other(_) => "other",
-            };
-            let value = json!({
-                "error": {
-                    "code": code,
-                    "message": err.to_string(),
-                    "exit": exit,
-                }
-            });
-            self.print_json(&value);
-        } else {
+        let kind = kind_for(err);
+        let envelope = json!({
+            "error": {
+                "kind": kind,
+                "message": err.to_string(),
+                "exit_code": exit,
+            }
+        });
+        // The envelope is always the last line of stderr.
+        if !self.json {
             eprintln!("error: {err}");
         }
+        eprintln!(
+            "{}",
+            serde_json::to_string(&envelope).expect("serialize error envelope")
+        );
         exit
     }
 }
@@ -101,14 +116,26 @@ mod tests {
 
     #[test]
     fn json_forced_on_when_not_tty() {
-        // Tests run without a TTY, so `new(false, false)` should still set json=true.
-        let cfg = OutputConfig::new(false, false);
+        // Tests run without a TTY, so auto format should still set json=true.
+        let cfg = OutputConfig::new(OutputFormat::Auto, false);
+        assert!(cfg.json);
+    }
+
+    #[test]
+    fn explicit_text_wins_over_auto() {
+        let cfg = OutputConfig::new(OutputFormat::Text, false);
+        assert!(!cfg.json, "text format must not emit JSON even when piped");
+    }
+
+    #[test]
+    fn explicit_json_wins_over_auto() {
+        let cfg = OutputConfig::new(OutputFormat::Json, false);
         assert!(cfg.json);
     }
 
     #[test]
     fn quiet_flag_propagates() {
-        let cfg = OutputConfig::new(false, true);
+        let cfg = OutputConfig::new(OutputFormat::Auto, true);
         assert!(cfg.quiet);
     }
 

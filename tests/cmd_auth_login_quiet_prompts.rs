@@ -93,7 +93,7 @@ async fn auth_login_json_quiet_shows_prompt_on_stderr_not_stdout() {
         .env("MICROSOFT_LOGIN_ENDPOINT", server.uri())
         .env("SHAREPOINT_TENANT_ID", "t2")
         .env("SHAREPOINT_CLIENT_ID", "cid-2")
-        .args(["--json", "--quiet", "auth", "login"])
+        .args(["--output", "json", "--quiet", "auth", "login"])
         .output()
         .unwrap();
 

@@ -62,7 +62,8 @@ async fn drives_list_returns_libraries_for_site_url() {
         .env("SHAREPOINT_ACCESS_TOKEN", "FAKE")
         .env("MICROSOFT_GRAPH_ENDPOINT", server.uri())
         .args([
-            "--json",
+            "--output",
+            "json",
             "drives",
             "list",
             "https://contoso.sharepoint.com/sites/Marketing",
@@ -130,7 +131,7 @@ async fn drives_list_accepts_spo_uri() {
         .env("SHAREPOINT_CLIENT_ID", "client-1")
         .env("SHAREPOINT_ACCESS_TOKEN", "FAKE")
         .env("MICROSOFT_GRAPH_ENDPOINT", server.uri())
-        .args(["--json", "drives", "list", "spo://Marketing"])
+        .args(["--output", "json", "drives", "list", "spo://Marketing"])
         .assert()
         .success()
         .stdout(contains("Shared Documents"));

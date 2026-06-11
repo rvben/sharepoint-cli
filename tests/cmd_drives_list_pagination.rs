@@ -83,7 +83,8 @@ async fn drives_list_all_follows_next_link() {
         .env("SHAREPOINT_ACCESS_TOKEN", "AT")
         .env("MICROSOFT_GRAPH_ENDPOINT", server.uri())
         .args([
-            "--json",
+            "--output",
+            "json",
             "drives",
             "list",
             "--all",
