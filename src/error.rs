@@ -10,8 +10,6 @@ pub enum CliError {
     Auth(String),
     /// Read-only mode blocked a write (exit 2).
     ReadOnly(String),
-    /// Destructive command refused without --yes (exit 2).
-    ConfirmationRequired(String),
     /// Resource exists with conflicting configuration (exit 7).
     Conflict(String),
     /// Site, library, or item not found (exit 4).
@@ -32,7 +30,6 @@ impl fmt::Display for CliError {
             CliError::Input(m) => write!(f, "{m}"),
             CliError::Auth(m) => write!(f, "{m}"),
             CliError::ReadOnly(m) => write!(f, "{m}"),
-            CliError::ConfirmationRequired(m) => write!(f, "{m}"),
             CliError::Conflict(m) => write!(f, "{m}"),
             CliError::NotFound(m) => write!(f, "{m}"),
             CliError::Api { status, message } => write!(f, "Graph API {status}: {message}"),
@@ -76,9 +73,7 @@ pub mod exit_codes {
 
 pub fn exit_code_for(err: &CliError) -> i32 {
     match err {
-        CliError::Input(_) | CliError::ReadOnly(_) | CliError::ConfirmationRequired(_) => {
-            exit_codes::INPUT
-        }
+        CliError::Input(_) | CliError::ReadOnly(_) => exit_codes::INPUT,
         CliError::Auth(_) => exit_codes::AUTH,
         CliError::NotFound(_) => exit_codes::NOT_FOUND,
         CliError::Api { .. } => exit_codes::API,
@@ -94,7 +89,6 @@ pub fn kind_for(err: &CliError) -> &'static str {
         CliError::Input(_) => "input",
         CliError::Auth(_) => "auth",
         CliError::ReadOnly(_) => "read_only",
-        CliError::ConfirmationRequired(_) => "confirmation_required",
         CliError::Conflict(_) => "conflict",
         CliError::NotFound(_) => "not_found",
         CliError::Api { .. } => "api",
@@ -157,14 +151,6 @@ mod tests {
     }
 
     #[test]
-    fn confirmation_required_maps_to_exit_2() {
-        assert_eq!(
-            exit_code_for(&CliError::ConfirmationRequired("x".into())),
-            2
-        );
-    }
-
-    #[test]
     fn conflict_maps_to_exit_7() {
         assert_eq!(exit_code_for(&CliError::Conflict("x".into())), 7);
     }
@@ -183,10 +169,6 @@ mod tests {
         assert_eq!(kind_for(&CliError::Input("x".into())), "input");
         assert_eq!(kind_for(&CliError::Auth("x".into())), "auth");
         assert_eq!(kind_for(&CliError::ReadOnly("x".into())), "read_only");
-        assert_eq!(
-            kind_for(&CliError::ConfirmationRequired("x".into())),
-            "confirmation_required"
-        );
         assert_eq!(kind_for(&CliError::Conflict("x".into())), "conflict");
         assert_eq!(kind_for(&CliError::NotFound("x".into())), "not_found");
         assert_eq!(

@@ -117,9 +117,6 @@ pub enum SitesCmd {
     Use {
         /// Site name or URL.
         site: String,
-        /// Skip confirmation prompt (required when stdin is not a TTY).
-        #[arg(long)]
-        yes: bool,
     },
 }
 

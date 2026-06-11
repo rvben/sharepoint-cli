@@ -122,11 +122,10 @@ pub fn run() -> crate::error::Result<()> {
             },
             {
                 "name": "sites use",
-                "description": "Set the default site for the active profile. Writes the config file; requires confirmation in non-TTY contexts.",
+                "description": "Set the default site for the active profile. Writes the config file; idempotent and safe to re-run.",
                 "mutating": true,
                 "args": [
-                    {"name": "site", "type": "string", "required": true, "description": "Site name or URL."},
-                    {"name": "--yes", "type": "boolean", "required": false, "default": false, "description": "Skip confirmation prompt (required when stdin is not a TTY)."}
+                    {"name": "site", "type": "string", "required": true, "description": "Site name or URL."}
                 ],
                 "output_fields": [
                     {"name": "profile", "type": "string"},
@@ -290,12 +289,6 @@ pub fn run() -> crate::error::Result<()> {
                 "exit_code": 2,
                 "retryable": false,
                 "description": "Write operation blocked because SHAREPOINT_READ_ONLY=true or read_only=true in config."
-            },
-            {
-                "kind": "confirmation_required",
-                "exit_code": 2,
-                "retryable": false,
-                "description": "Destructive command refused without explicit --yes flag and no TTY available."
             },
             {
                 "kind": "conflict",

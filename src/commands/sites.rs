@@ -1,7 +1,5 @@
 //! `sharepoint sites list | use`
 
-use std::io::IsTerminal;
-
 use crate::auth::AuthContext;
 use crate::cli::{Runtime, SitesCmd};
 use crate::config;
@@ -17,7 +15,7 @@ pub async fn run(rt: &Runtime, cmd: SitesCmd) -> Result<()> {
             page,
             fields,
         } => list(rt, query.as_deref(), limit, all, page.as_deref(), &fields).await,
-        SitesCmd::Use { site, yes } => use_site(rt, &site, yes).await,
+        SitesCmd::Use { site } => use_site(rt, &site).await,
     }
 }
 
@@ -115,17 +113,11 @@ async fn list(
     Ok(())
 }
 
-async fn use_site(rt: &Runtime, value: &str, yes: bool) -> Result<()> {
+async fn use_site(rt: &Runtime, value: &str) -> Result<()> {
     if rt.cfg.read_only {
         return Err(CliError::ReadOnly(
             "sites use modifies the config file; not allowed in read-only mode".into(),
         ));
-    }
-    // Require --yes when stdin is not a TTY (no interactive confirmation possible).
-    if !yes && !std::io::stdin().is_terminal() {
-        return Err(CliError::ConfirmationRequired(format!(
-            "setting the default site to '{value}' requires confirmation; re-run with --yes to confirm"
-        )));
     }
     let mut file = rt.config_file.clone();
     let entry = file.profile.entry(rt.cfg.profile_name.clone()).or_default();
