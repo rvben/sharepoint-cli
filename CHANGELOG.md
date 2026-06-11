@@ -9,6 +9,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 
 
+
+## [0.0.7](https://github.com/rvben/sharepoint-cli/compare/v0.0.6...v0.0.7) - 2026-06-11
+
+### Added
+
+- make sharepoint CLI fully compliant with clispec v0.2 (24/24) ([8cfc497](https://github.com/rvben/sharepoint-cli/commit/8cfc497b893abea59eb5d029ba7ac2655d966292))
+
+### Fixed
+
+- remove no-op --yes from init; expose sites use --yes to schema bypass check ([0a2ea3e](https://github.com/rvben/sharepoint-cli/commit/0a2ea3e2b0a64d387d27472f42c134cf81c3699f))
+
 ## [0.0.6](https://github.com/rvben/sharepoint-cli/compare/v0.0.5...v0.0.6) - 2026-05-06
 
 ## [0.0.5](https://github.com/rvben/sharepoint-cli/compare/v0.0.4...v0.0.5) - 2026-05-06
