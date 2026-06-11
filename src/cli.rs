@@ -165,6 +165,7 @@ pub enum FilesCmd {
     Download {
         #[arg(value_name = "REF")]
         reference: String,
+        /// Destination path (or `-` for stdout). Use `--output` as an alias.
         #[arg(long, short = 'p')]
         path: Option<String>,
         #[arg(long)]
