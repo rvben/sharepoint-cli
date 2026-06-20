@@ -104,7 +104,19 @@ pub fn run() -> crate::error::Result<()> {
                         "name": "show",
                         "description": "Print the resolved config with secrets masked.",
                         "mutating": false,
-                        "args": []
+                        "args": [],
+                        "output_fields": [
+                            {"name": "profile", "type": "string", "description": "Active profile name."},
+                            {"name": "tenant_id", "type": "string | null", "description": "Azure AD tenant ID or domain."},
+                            {"name": "client_id", "type": "string | null", "description": "Entra public-client app client ID."},
+                            {"name": "default_site", "type": "string | null", "description": "Default SharePoint site name or URL for this profile."},
+                            {"name": "read_only", "type": "boolean", "description": "Whether write operations are blocked for this profile."},
+                            {"name": "site_aliases", "type": "object", "description": "Map of alias names to site URLs or names."},
+                            {"name": "graph_endpoint", "type": "string", "description": "Microsoft Graph API base URL."},
+                            {"name": "login_endpoint", "type": "string", "description": "Azure AD login base URL."},
+                            {"name": "config_path", "type": "string", "description": "Absolute path to the resolved config file."},
+                            {"name": "cache_path", "type": "string", "description": "Absolute path to the token cache directory."}
+                        ]
                     },
                     {
                         "name": "path",
@@ -118,7 +130,12 @@ pub fn run() -> crate::error::Result<()> {
                 "name": "init",
                 "description": "Interactive setup: write a config profile and run the first device-code login.",
                 "mutating": true,
-                "args": []
+                "args": [],
+                "output_fields": [
+                    {"name": "username", "type": "string", "description": "UPN of the signed-in account (e.g. user@contoso.com)."},
+                    {"name": "name", "type": "string", "description": "Display name of the signed-in account."},
+                    {"name": "tenant_id", "type": "string", "description": "Azure AD tenant GUID for the signed-in account."}
+                ]
             },
             {
                 "name": "sites use",
