@@ -10,6 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 
 
+
+## [0.0.8](https://github.com/rvben/sharepoint-cli/compare/v0.0.7...v0.0.8) - 2026-06-20
+
+### Added
+
+- **schema**: fill missing output_fields for config show and init ([5738d13](https://github.com/rvben/sharepoint-cli/commit/5738d13afc11a32e62432800cc526a34fab4b4dc))
+
 ## [0.0.7](https://github.com/rvben/sharepoint-cli/compare/v0.0.6...v0.0.7) - 2026-06-11
 
 ### Added
