@@ -150,9 +150,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo publish --locked
+      - name: Publish to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if ! output=$(cargo publish --locked 2>&1); then
+            if echo "$output" | grep -q "already uploaded"; then
+              echo "Crate already published to crates.io, skipping"
+            else
+              echo "$output"
+              exit 1
+            fi
+          fi
 
   publish-pypi:
     needs: [build, sdist]
