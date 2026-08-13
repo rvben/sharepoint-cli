@@ -24,7 +24,26 @@ async fn show(rt: &Runtime) -> Result<()> {
         "cache_path": rt.cache_path.display().to_string(),
         // Tokens deliberately omitted — they are bearer secrets.
     });
-    rt.out.print_json(&value);
+    if rt.out.json {
+        rt.out.print_json(&value);
+    } else {
+        let masked = |key: &str| {
+            value
+                .get(key)
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("-")
+        };
+        rt.out.print_data(&format!(
+            "Profile: {}\nTenant: {}\nClient ID: {}\nDefault site: {}\nRead only: {}\nConfig: {}\nToken cache: {}",
+            masked("profile"),
+            masked("tenant_id"),
+            masked("client_id"),
+            masked("default_site"),
+            value["read_only"],
+            masked("config_path"),
+            masked("cache_path")
+        ));
+    }
     Ok(())
 }
 

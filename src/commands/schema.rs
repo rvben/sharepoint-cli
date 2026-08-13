@@ -4,11 +4,11 @@
 //! network access. It is the first thing an agent calls when it knows nothing
 //! about the tool.
 
-use serde_json::json;
+use serde_json::{Value, json};
 
 pub fn run() -> crate::error::Result<()> {
-    let schema = json!({
-        "clispec": "0.2",
+    let mut schema = json!({
+        "clispec": "0.3",
         "name": "sharepoint",
         "version": env!("CARGO_PKG_VERSION"),
         "description": "Agent-friendly SharePoint Online CLI with JSON output, structured exit codes, and schema introspection",
@@ -345,10 +345,136 @@ pub fn run() -> crate::error::Result<()> {
             }
         ]
     });
+    enrich_v0_3(&mut schema);
 
     println!(
         "{}",
         serde_json::to_string_pretty(&schema).expect("serialize schema")
     );
     Ok(())
+}
+
+fn flatten_commands(commands: &[Value], prefix: &str, output: &mut Vec<Value>) {
+    for command in commands {
+        let Some(object) = command.as_object() else {
+            continue;
+        };
+        let local_name = object
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let name = if prefix.is_empty() || local_name.starts_with(&format!("{prefix} ")) {
+            local_name.to_string()
+        } else {
+            format!("{prefix} {local_name}")
+        };
+        if let Some(children) = object.get("subcommands").and_then(Value::as_array) {
+            flatten_commands(children, &name, output);
+            continue;
+        }
+        let mut leaf = object.clone();
+        leaf.remove("subcommands");
+        leaf.insert("name".into(), json!(name));
+        let value = Value::Object(leaf);
+        if let Some(existing) = output
+            .iter()
+            .position(|item| item.get("name") == value.get("name"))
+        {
+            output[existing] = value;
+        } else {
+            output.push(value);
+        }
+    }
+}
+
+fn enrich_v0_3(schema: &mut Value) {
+    schema["output"] = json!({"tty":"text","piped":"json"});
+    let source = schema["commands"].as_array().cloned().unwrap_or_default();
+    let mut commands = Vec::new();
+    flatten_commands(&source, "", &mut commands);
+    if !commands.iter().any(|command| command["name"] == "schema") {
+        commands.push(json!({
+            "name":"schema",
+            "description":"Print the machine-readable clispec v0.3 schema.",
+            "mutating":false,
+            "effects":"read_only",
+            "cardinality":"single",
+            "stdout_schema":{"$ref":"https://clispec.dev/schema/v0.3.json"}
+        }));
+    }
+
+    for command in &mut commands {
+        let Some(object) = command.as_object_mut() else {
+            continue;
+        };
+        let name = object["name"].as_str().unwrap_or_default().to_string();
+        if name == "files download" {
+            object.insert("mutating".into(), json!(true));
+        }
+        let mutating = object["mutating"].as_bool().unwrap_or(false);
+        object.insert(
+            "effects".into(),
+            json!(if !mutating {
+                "read_only"
+            } else if matches!(
+                name.as_str(),
+                "auth logout" | "sites use" | "files download"
+            ) {
+                "idempotent"
+            } else {
+                "non_idempotent"
+            }),
+        );
+
+        let unbounded = matches!(
+            name.as_str(),
+            "auth status" | "sites list" | "files ls" | "files find"
+        );
+        object.insert(
+            "cardinality".into(),
+            json!(if unbounded { "unbounded" } else { "bounded" }),
+        );
+        if unbounded {
+            object.insert(
+                "pagination".into(),
+                json!({
+                    "style":"cursor",
+                    "cursor_field":"next",
+                    "cursor_arg":"--page",
+                    "limit_arg":"--limit"
+                }),
+            );
+            object.insert("fields_arg".into(), json!("--fields"));
+        }
+        if name == "sites use" {
+            object.insert("confirmation_bypass_arg".into(), json!("--yes"));
+        }
+        if name == "config show" {
+            object.insert("example".into(), json!({"args":["config","show"]}));
+        }
+
+        if let Some(fields) = object
+            .get_mut("output_fields")
+            .and_then(Value::as_array_mut)
+        {
+            for field in fields {
+                let Some(field) = field.as_object_mut() else {
+                    continue;
+                };
+                if let Some(kind) = field.get("type").and_then(Value::as_str).map(str::to_owned) {
+                    if let Some(base) = kind.strip_suffix(" | null") {
+                        field.insert("type".into(), json!(base));
+                        field.insert("nullable".into(), json!(true));
+                    } else if let Some(base) = kind.strip_suffix("[]") {
+                        field.insert("type".into(), json!("array"));
+                        field.insert("items".into(), json!({"type":base}));
+                    }
+                }
+            }
+        }
+        if !object.contains_key("output_fields") && !object.contains_key("stdout_schema") {
+            object.insert("stdout_schema".into(), json!({}));
+        }
+    }
+    schema["commands"] = Value::Array(commands);
 }
