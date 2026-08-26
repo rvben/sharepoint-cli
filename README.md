@@ -51,6 +51,20 @@ sharepoint files find   <site>:<library>/ --name '*.pdf'
 sharepoint doctor
 ```
 
+For a headless or staged setup, provide the tenant and public-client application
+ID explicitly and defer sign-in:
+
+```sh
+sharepoint init --tenant contoso.onmicrosoft.com \
+  --client-id 00000000-0000-0000-0000-000000000000 \
+  --default-site Marketing --read-only --no-login
+sharepoint auth login
+```
+
+Interactive setup reuses existing profile values as defaults. Non-interactive
+setup never reads prompts from piped stdin; missing values produce an actionable
+input error instead.
+
 ## Output
 
 - Human output on stdout, status messages on stderr.

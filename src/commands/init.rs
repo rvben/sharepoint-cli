@@ -1,61 +1,62 @@
-//! `sharepoint init` — interactive first-run setup.
+//! `sharepoint init` — guided or headless first-run setup.
 //!
-//! Prompts for tenant + (optional) default site, writes the config file,
-//! then runs the same device-code login as `sharepoint auth login`. Only
-//! device-code authentication is supported; client-credential flows are
-//! not yet implemented.
+//! Resolves the tenant, client ID, and optional default site; writes the
+//! config file; then runs the same device-code login as `sharepoint auth
+//! login`. Headless callers can provide explicit values and defer login.
 
-use std::io::{BufRead, Write};
+use std::io::{BufRead, IsTerminal, Write};
 
-use crate::cli::{AuthCmd, Runtime};
+use crate::cli::{AuthCmd, InitArgs, Runtime};
 use crate::commands::auth;
 use crate::config;
 use crate::error::{CliError, Result};
 
-pub async fn run(rt: &Runtime) -> Result<()> {
-    if rt.out.quiet {
-        return Err(CliError::Input(
-            "init is interactive and cannot run with --quiet".into(),
-        ));
-    }
+pub async fn run(rt: &Runtime, args: InitArgs) -> Result<()> {
+    let interactive = std::io::stdin().is_terminal() && std::io::stderr().is_terminal();
     // `read_only` does not gate init: init bootstraps the config file from
     // scratch, and would have nothing to protect if the file does not exist.
-    rt.out.print_message(&format!(
-        "Let's connect the '{}' profile to SharePoint.",
-        rt.cfg.profile_name
-    ));
+    if interactive {
+        rt.out.print_message(&format!(
+            "Let's connect the '{}' profile to SharePoint.",
+            rt.cfg.profile_name
+        ));
+    }
     let stdin = std::io::stdin();
     let mut lines = stdin.lock().lines();
 
-    let tenant = prompt(
+    let tenant = resolve_required(
         &mut lines,
-        "Tenant (domain or GUID, e.g. contoso.onmicrosoft.com): ",
+        interactive,
+        "Tenant (domain or GUID)",
+        rt.cfg.tenant_id.as_deref(),
+        "--tenant <domain-or-guid> or SHAREPOINT_TENANT_ID",
     )?;
-    if tenant.is_empty() {
-        return Err(CliError::Input("tenant is required".into()));
-    }
-    let client_id = prompt(&mut lines, "Client ID (Entra public-client app GUID): ")?;
-    if client_id.is_empty() {
-        return Err(CliError::Input(
-            "client_id is required: register an Entra public-client app \
-             (device-code flow, delegated Files.Read.All / Sites.Read.All / offline_access \
-             scopes) and paste its Application (client) ID here"
-                .into(),
-        ));
-    }
-    let default_site = prompt(
+    let client_id = resolve_required(
         &mut lines,
-        "Default site name or URL (optional, press enter to skip): ",
+        interactive,
+        "Client ID (Entra public-client app GUID)",
+        rt.cfg.client_id.as_deref(),
+        "--client-id <application-id> or SHAREPOINT_CLIENT_ID",
     )?;
+    let configured_site = args.default_site.or_else(|| rt.cfg.default_site.clone());
+    let default_site = if interactive {
+        prompt_value(
+            &mut lines,
+            "Default site name or URL",
+            configured_site.as_deref(),
+            true,
+        )?
+    } else {
+        configured_site
+    };
 
     let profile_name = rt.cfg.profile_name.clone();
     let mut file = rt.config_file.clone();
     let entry = file.profile.entry(profile_name.clone()).or_default();
     entry.tenant_id = Some(tenant.clone());
     entry.client_id = Some(client_id.clone());
-    if !default_site.is_empty() {
-        entry.default_site = Some(default_site.clone());
-    }
+    entry.default_site = default_site.clone();
+    entry.read_only = args.read_only || rt.cfg.read_only;
     config::save_file(&rt.config_path, &file)?;
     rt.out
         .print_message(&format!("Wrote {}", rt.config_path.display()));
@@ -64,13 +65,9 @@ pub async fn run(rt: &Runtime) -> Result<()> {
     let mut updated = rt.cfg.clone();
     updated.tenant_id = Some(tenant);
     updated.client_id = Some(client_id);
-    updated.default_site = if default_site.is_empty() {
-        file.profile
-            .get(&profile_name)
-            .and_then(|p| p.default_site.clone())
-    } else {
-        Some(default_site)
-    };
+    updated.default_site = default_site;
+    updated.read_only = args.read_only || rt.cfg.read_only;
+    let read_only = updated.read_only;
     let new_rt = Runtime {
         out: rt.out,
         cfg: updated,
@@ -79,6 +76,23 @@ pub async fn run(rt: &Runtime) -> Result<()> {
         cache_path: rt.cache_path.clone(),
     };
 
+    if args.no_login {
+        if rt.out.json {
+            rt.out.print_json(&serde_json::json!({
+                "profile": profile_name,
+                "config_path": rt.config_path,
+                "signed_in": false,
+                "read_only": read_only,
+                "next": "sharepoint auth login",
+            }));
+        } else {
+            rt.out.print_data(&format!(
+                "Profile '{profile_name}' saved. Next: `sharepoint auth login`."
+            ));
+        }
+        return Ok(());
+    }
+
     auth::run(&new_rt, AuthCmd::Login).await?;
     rt.out.print_message(
         "Ready. Run `sharepoint doctor` to verify access, then `sharepoint sites list`.",
@@ -86,12 +100,51 @@ pub async fn run(rt: &Runtime) -> Result<()> {
     Ok(())
 }
 
-fn prompt(lines: &mut std::io::Lines<std::io::StdinLock<'_>>, label: &str) -> Result<String> {
-    eprint!("{label}");
+fn resolve_required(
+    lines: &mut std::io::Lines<std::io::StdinLock<'_>>,
+    interactive: bool,
+    label: &str,
+    current: Option<&str>,
+    non_interactive_help: &str,
+) -> Result<String> {
+    if interactive {
+        return prompt_value(lines, label, current, false)?
+            .ok_or_else(|| CliError::Input(format!("{label} is required")));
+    }
+
+    current
+        .filter(|value| !value.trim().is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            CliError::Input(format!(
+                "{label} is required in non-interactive mode; pass {non_interactive_help}"
+            ))
+        })
+}
+
+fn prompt_value(
+    lines: &mut std::io::Lines<std::io::StdinLock<'_>>,
+    label: &str,
+    current: Option<&str>,
+    optional: bool,
+) -> Result<Option<String>> {
+    let default = current.filter(|value| !value.trim().is_empty());
+    match default {
+        Some(value) => eprint!("{label} [{value}]: "),
+        None if optional => eprint!("{label} (optional): "),
+        None => eprint!("{label}: "),
+    }
     std::io::stderr().flush().ok();
     match lines.next() {
-        Some(Ok(line)) => Ok(line.trim().to_string()),
+        Some(Ok(line)) => {
+            let value = line.trim();
+            if value.is_empty() {
+                Ok(default.map(str::to_owned))
+            } else {
+                Ok(Some(value.to_string()))
+            }
+        }
         Some(Err(e)) => Err(CliError::Other(format!("read stdin: {e}"))),
-        None => Ok(String::new()),
+        None => Ok(default.map(str::to_owned)),
     }
 }

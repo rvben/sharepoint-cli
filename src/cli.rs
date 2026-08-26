@@ -2,7 +2,7 @@
 
 use std::io;
 
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
 
 use crate::config::{self, ConfigFile, ENV_CLIENT_ID, ENV_PROFILE, ENV_TENANT, ResolvedConfig};
@@ -59,8 +59,8 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Interactive setup + first device-code login.
-    Init,
+    /// Configure a profile and optionally start device-code login.
+    Init(InitArgs),
     /// Sub-commands: login, logout, status.
     #[command(subcommand)]
     Auth(AuthCmd),
@@ -110,6 +110,21 @@ pub enum AuthCmd {
         #[arg(long, value_delimiter = ',')]
         fields: Vec<String>,
     },
+}
+
+#[derive(Debug, Args)]
+pub struct InitArgs {
+    /// Default site name or URL for commands that omit a site.
+    #[arg(long, env = config::ENV_DEFAULT_SITE)]
+    pub default_site: Option<String>,
+
+    /// Save the profile without starting device-code login.
+    #[arg(long)]
+    pub no_login: bool,
+
+    /// Block remote write operations for this profile.
+    #[arg(long, env = config::ENV_READ_ONLY)]
+    pub read_only: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -263,7 +278,7 @@ pub async fn run(cli: Cli) -> Result<()> {
     let rt = Runtime::build(&cli)?;
     match cli.command {
         Command::Schema { .. } | Command::Completions { .. } => unreachable!(),
-        Command::Init => crate::commands::init::run(&rt).await,
+        Command::Init(args) => crate::commands::init::run(&rt, args).await,
         Command::Auth(sub) => crate::commands::auth::run(&rt, sub).await,
         Command::Config(sub) => crate::commands::config::run(&rt, sub).await,
         Command::Sites(sub) => crate::commands::sites::run(&rt, sub).await,
