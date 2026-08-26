@@ -48,6 +48,7 @@ sharepoint files ls <site>:<library>/
 sharepoint files stat   <site>:<library>/path/to/file
 sharepoint files download <site>:<library>/path/to/file -o ./out.bin
 sharepoint files find   <site>:<library>/ --name '*.pdf'
+sharepoint doctor
 ```
 
 ## Output
@@ -55,6 +56,9 @@ sharepoint files find   <site>:<library>/ --name '*.pdf'
 - Human output on stdout, status messages on stderr.
 - `--json` (or non-TTY stdout) emits machine-readable JSON on stdout.
 - `--quiet` suppresses status messages.
+- `--no-color` and the standard `NO_COLOR` environment variable disable ANSI output.
+
+Suite-level discovery is available without guessing: use `sharepoint doctor --offline`, `sharepoint schema --command 'files stat'`, `sharepoint config show`, and `sharepoint completions <shell>`.
 
 ## Configuration
 

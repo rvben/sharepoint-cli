@@ -86,15 +86,14 @@ pub fn exit_code_for(err: &CliError) -> i32 {
 /// Stable kind string for the structured error envelope.
 pub fn kind_for(err: &CliError) -> &'static str {
     match err {
-        CliError::Input(_) => "input",
+        CliError::Input(_) => "invalid_input",
         CliError::Auth(_) => "auth",
         CliError::ReadOnly(_) => "read_only",
         CliError::Conflict(_) => "conflict",
         CliError::NotFound(_) => "not_found",
-        CliError::Api { .. } => "api",
+        CliError::Api { .. } => "api_error",
         CliError::RateLimit => "rate_limit",
-        CliError::Http(_) => "http",
-        CliError::Other(_) => "other",
+        CliError::Http(_) | CliError::Other(_) => "unexpected_error",
     }
 }
 
@@ -166,7 +165,7 @@ mod tests {
 
     #[test]
     fn kind_for_covers_all_variants() {
-        assert_eq!(kind_for(&CliError::Input("x".into())), "input");
+        assert_eq!(kind_for(&CliError::Input("x".into())), "invalid_input");
         assert_eq!(kind_for(&CliError::Auth("x".into())), "auth");
         assert_eq!(kind_for(&CliError::ReadOnly("x".into())), "read_only");
         assert_eq!(kind_for(&CliError::Conflict("x".into())), "conflict");
@@ -176,10 +175,10 @@ mod tests {
                 status: 500,
                 message: "x".into()
             }),
-            "api"
+            "api_error"
         );
         assert_eq!(kind_for(&CliError::RateLimit), "rate_limit");
-        assert_eq!(kind_for(&CliError::Http("x".into())), "http");
-        assert_eq!(kind_for(&CliError::Other("x".into())), "other");
+        assert_eq!(kind_for(&CliError::Http("x".into())), "unexpected_error");
+        assert_eq!(kind_for(&CliError::Other("x".into())), "unexpected_error");
     }
 }

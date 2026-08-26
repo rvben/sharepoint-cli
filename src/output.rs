@@ -2,13 +2,22 @@
 //! color, and the structured error contract.
 
 use std::io::IsTerminal;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde_json::json;
 
 use crate::error::{CliError, exit_code_for, kind_for};
 
 pub fn use_color() -> bool {
-    std::env::var_os("NO_COLOR").is_none() && std::io::stdout().is_terminal()
+    !NO_COLOR.load(Ordering::Relaxed)
+        && std::env::var_os("NO_COLOR").is_none()
+        && std::io::stdout().is_terminal()
+}
+
+static NO_COLOR: AtomicBool = AtomicBool::new(false);
+
+pub fn set_no_color(disabled: bool) {
+    NO_COLOR.store(disabled, Ordering::Relaxed);
 }
 
 pub fn terminal_width() -> usize {
@@ -82,10 +91,8 @@ impl OutputConfig {
 
     /// Render a structured error.
     ///
-    /// The error envelope `{"error": {"kind": "...", "message": "...",
-    /// "exit_code": N}}` is always written as a single JSON line to **stderr**,
-    /// so that consumers can extract it mechanically regardless of output mode.
-    /// In plain-text mode we also print a human-readable prefix on stderr.
+    /// Machine-readable mode writes a one-line JSON envelope to stderr; text
+    /// mode writes one human-readable error. Stdout remains data-only.
     ///
     /// Returns the exit code the caller should use.
     pub fn render_error(&self, err: &CliError) -> i32 {
@@ -98,14 +105,14 @@ impl OutputConfig {
                 "exit_code": exit,
             }
         });
-        // The envelope is always the last line of stderr.
-        if !self.json {
+        if self.json {
+            eprintln!(
+                "{}",
+                serde_json::to_string(&envelope).expect("serialize error envelope")
+            );
+        } else {
             eprintln!("error: {err}");
         }
-        eprintln!(
-            "{}",
-            serde_json::to_string(&envelope).expect("serialize error envelope")
-        );
         exit
     }
 }

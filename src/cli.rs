@@ -1,6 +1,9 @@
 //! CLI entry point: clap derive structs and the `run` dispatcher.
 
-use clap::{Parser, Subcommand};
+use std::io;
+
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::Shell;
 
 use crate::config::{self, ConfigFile, ENV_CLIENT_ID, ENV_PROFILE, ENV_TENANT, ResolvedConfig};
 use crate::error::Result;
@@ -10,7 +13,7 @@ use crate::output::{OutputConfig, OutputFormat};
 #[command(
     name = "sharepoint",
     about = "Agent-friendly SharePoint Online CLI",
-    after_help = "Run `sharepoint schema` for a machine-readable description of all commands.",
+    after_help = "Get started:\n  sharepoint init                     Configure and sign in\n  sharepoint doctor                   Check configuration and Graph access\n  sharepoint sites list               Discover your sites\n  sharepoint schema --command 'files ls'\n                                      Inspect one command for automation",
     version,
     propagate_version = true,
     disable_help_subcommand = true
@@ -26,9 +29,17 @@ pub struct Cli {
     )]
     pub output: OutputFormat,
 
+    /// Alias for --output json.
+    #[arg(long, global = true, hide = true)]
+    pub json: bool,
+
     /// Suppress informational messages on stderr.
     #[arg(long, global = true)]
     pub quiet: bool,
+
+    /// Disable ANSI color even on a terminal.
+    #[arg(long, global = true)]
+    pub no_color: bool,
 
     /// Active config profile (default: "default"). Env: SHAREPOINT_PROFILE.
     #[arg(long, global = true, env = ENV_PROFILE)]
@@ -65,8 +76,20 @@ pub enum Command {
     /// Sub-commands: ls, stat, download, find.
     #[command(subcommand)]
     Files(FilesCmd),
+    /// Check configuration, credential cache, and Graph access.
+    Doctor {
+        /// Skip the Microsoft Graph connectivity check.
+        #[arg(long)]
+        offline: bool,
+    },
+    /// Generate shell completions.
+    Completions { shell: Shell },
     /// Emit a machine-readable description of all commands and their output shapes.
-    Schema,
+    Schema {
+        /// Return only one complete command path.
+        #[arg(long)]
+        command: Option<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -211,7 +234,14 @@ impl Runtime {
         }
         let cache_path = config::token_cache_path()?;
         Ok(Self {
-            out: OutputConfig::new(cli.output, cli.quiet),
+            out: OutputConfig::new(
+                if cli.json && cli.output == OutputFormat::Auto {
+                    OutputFormat::Json
+                } else {
+                    cli.output
+                },
+                cli.quiet,
+            ),
             cfg,
             config_file,
             config_path,
@@ -222,17 +252,23 @@ impl Runtime {
 
 pub async fn run(cli: Cli) -> Result<()> {
     // Schema runs before any config/auth is needed.
-    if matches!(cli.command, Command::Schema) {
-        return crate::commands::schema::run();
+    crate::output::set_no_color(cli.no_color);
+    if let Command::Schema { command } = &cli.command {
+        return crate::commands::schema::run(command.as_deref());
+    }
+    if let Command::Completions { shell } = &cli.command {
+        clap_complete::generate(*shell, &mut Cli::command(), "sharepoint", &mut io::stdout());
+        return Ok(());
     }
     let rt = Runtime::build(&cli)?;
     match cli.command {
-        Command::Schema => unreachable!(),
+        Command::Schema { .. } | Command::Completions { .. } => unreachable!(),
         Command::Init => crate::commands::init::run(&rt).await,
         Command::Auth(sub) => crate::commands::auth::run(&rt, sub).await,
         Command::Config(sub) => crate::commands::config::run(&rt, sub).await,
         Command::Sites(sub) => crate::commands::sites::run(&rt, sub).await,
         Command::Drives(sub) => crate::commands::drives::run(&rt, sub).await,
         Command::Files(sub) => crate::commands::files::run(&rt, sub).await,
+        Command::Doctor { offline } => crate::commands::doctor::run(&rt, offline).await,
     }
 }

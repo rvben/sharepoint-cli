@@ -6,7 +6,7 @@
 
 use serde_json::{Value, json};
 
-pub fn run() -> crate::error::Result<()> {
+pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
     let mut schema = json!({
         "clispec": "0.3",
         "name": "sharepoint",
@@ -32,6 +32,12 @@ pub fn run() -> crate::error::Result<()> {
                 "type": "boolean",
                 "default": false,
                 "description": "Suppress informational messages on stderr."
+            },
+            {
+                "name": "--no-color",
+                "type": "boolean",
+                "default": false,
+                "description": "Disable ANSI color."
             },
             {
                 "name": "--profile",
@@ -290,7 +296,7 @@ pub fn run() -> crate::error::Result<()> {
         ],
         "errors": [
             {
-                "kind": "input",
+                "kind": "invalid_input",
                 "exit_code": 2,
                 "retryable": false,
                 "description": "Bad user input, missing required argument, or invalid configuration."
@@ -320,7 +326,7 @@ pub fn run() -> crate::error::Result<()> {
                 "description": "Site, drive, or item not found."
             },
             {
-                "kind": "api",
+                "kind": "api_error",
                 "exit_code": 5,
                 "retryable": false,
                 "description": "Microsoft Graph API returned a non-2xx response."
@@ -332,20 +338,23 @@ pub fn run() -> crate::error::Result<()> {
                 "description": "Too many requests; Microsoft Graph is rate-limiting this client."
             },
             {
-                "kind": "http",
+                "kind": "unexpected_error",
                 "exit_code": 1,
                 "retryable": true,
-                "description": "Underlying HTTP transport error (network failure, TLS, timeout)."
-            },
-            {
-                "kind": "other",
-                "exit_code": 1,
-                "retryable": false,
-                "description": "Unexpected internal error."
+                "description": "Unexpected local or transport error."
             }
         ]
     });
     enrich_v0_3(&mut schema);
+    if let Some(filter) = command_filter {
+        let commands = schema["commands"].as_array_mut().expect("commands array");
+        commands.retain(|command| command["name"] == filter);
+        if commands.is_empty() {
+            return Err(crate::error::CliError::NotFound(format!(
+                "command '{filter}' is not declared"
+            )));
+        }
+    }
 
     println!(
         "{}",
@@ -399,9 +408,28 @@ fn enrich_v0_3(schema: &mut Value) {
             "mutating":false,
             "effects":"read_only",
             "cardinality":"single",
-            "stdout_schema":{"$ref":"https://clispec.dev/schema/v0.3.json"}
+            "stdout_schema":{"$ref":"https://clispec.dev/schema/v0.3.json"},
+            "args":[{"name":"--command","type":"string","description":"Return only one complete command path"}]
         }));
     }
+    commands.push(json!({
+        "name":"doctor",
+        "description":"Check configuration, credential cache, and Graph access.",
+        "mutating":false,
+        "effects":"read_only",
+        "cardinality":"single",
+        "args":[{"name":"--offline","type":"boolean","description":"Skip the Microsoft Graph connectivity check"}],
+        "output_fields":[{"name":"checks","type":"array","items":{"type":"object"}},{"name":"healthy","type":"boolean"}]
+    }));
+    commands.push(json!({
+        "name":"completions",
+        "description":"Generate a shell completion script.",
+        "mutating":false,
+        "effects":"read_only",
+        "output_kind":"opaque",
+        "media_type":"text/plain",
+        "args":[{"name":"shell","type":"string","required":true,"description":"Shell name"}]
+    }));
 
     for command in &mut commands {
         let Some(object) = command.as_object_mut() else {
@@ -425,6 +453,11 @@ fn enrich_v0_3(schema: &mut Value) {
                 "non_idempotent"
             }),
         );
+        if object.get("output_kind").and_then(Value::as_str) == Some("opaque") {
+            object.remove("cardinality");
+            object.remove("stdout_schema");
+            continue;
+        }
 
         let unbounded = matches!(
             name.as_str(),

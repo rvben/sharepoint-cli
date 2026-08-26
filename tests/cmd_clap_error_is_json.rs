@@ -22,7 +22,7 @@ fn clap_error_renders_structured_error_on_stderr() {
     let v: serde_json::Value =
         serde_json::from_str(last_json_line).expect("last stderr JSON line must be valid JSON");
 
-    assert_eq!(v["error"]["kind"], "input");
+    assert_eq!(v["error"]["kind"], "invalid_input");
     assert_eq!(v["error"]["exit_code"], 2);
     let message = v["error"]["message"]
         .as_str()

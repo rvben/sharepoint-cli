@@ -20,6 +20,10 @@ pub async fn run(rt: &Runtime) -> Result<()> {
     }
     // `read_only` does not gate init: init bootstraps the config file from
     // scratch, and would have nothing to protect if the file does not exist.
+    rt.out.print_message(&format!(
+        "Let's connect the '{}' profile to SharePoint.",
+        rt.cfg.profile_name
+    ));
     let stdin = std::io::stdin();
     let mut lines = stdin.lock().lines();
 
@@ -75,7 +79,11 @@ pub async fn run(rt: &Runtime) -> Result<()> {
         cache_path: rt.cache_path.clone(),
     };
 
-    auth::run(&new_rt, AuthCmd::Login).await
+    auth::run(&new_rt, AuthCmd::Login).await?;
+    rt.out.print_message(
+        "Ready. Run `sharepoint doctor` to verify access, then `sharepoint sites list`.",
+    );
+    Ok(())
 }
 
 fn prompt(lines: &mut std::io::Lines<std::io::StdinLock<'_>>, label: &str) -> Result<String> {

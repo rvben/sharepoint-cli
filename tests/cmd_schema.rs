@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use predicates::prelude::*;
 
 /// The clispec v0.3 JSON Schema, vendored so the test runs offline.
 const CLISPEC_V0_3: &str = include_str!("fixtures/clispec-v0.3.json");
@@ -48,6 +49,40 @@ fn schema_works_without_credentials() {
             .unwrap_or(false),
         "version field must be a non-empty string"
     );
+}
+
+#[test]
+fn schema_can_select_one_command() {
+    Command::cargo_bin("sharepoint")
+        .unwrap()
+        .args(["schema", "--command", "files stat"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"name\": \"files stat\"")
+                .and(predicate::str::contains("sites list").not()),
+        );
+}
+
+#[test]
+fn doctor_offline_is_actionable_without_configuration() {
+    let dir = tempfile::tempdir().unwrap();
+    let output = Command::cargo_bin("sharepoint")
+        .unwrap()
+        .env_clear()
+        .env("PATH", std::env::var("PATH").unwrap_or_default())
+        .env("HOME", dir.path())
+        .env("XDG_CONFIG_HOME", dir.path())
+        .env("XDG_CACHE_HOME", dir.path())
+        .args(["doctor", "--offline"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(report["healthy"], false);
+    assert!(report["checks"].as_array().unwrap().len() >= 4);
 }
 
 /// The output of `sharepoint schema` must validate against the clispec v0.3
