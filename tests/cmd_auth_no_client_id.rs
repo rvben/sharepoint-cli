@@ -37,5 +37,5 @@ fn headless_init_errors_when_client_id_is_missing() {
         .args(["--tenant", "contoso", "init"])
         .assert()
         .failure()
-        .stderr(contains("client_id is required"));
+        .stderr(contains("--client-id"));
 }
