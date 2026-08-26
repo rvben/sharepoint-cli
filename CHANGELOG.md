@@ -4,12 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.0.10](https://github.com/rvben/sharepoint-cli/compare/v0.0.9...v0.0.10) - 2026-08-26
 
+### Added
 
+- **onboarding**: support headless setup ([73ce208](https://github.com/rvben/sharepoint-cli/commit/73ce2082ba369d56725652da87ba85b52bd72f3b))
+- **cli**: add diagnostics and suite conventions ([405fa72](https://github.com/rvben/sharepoint-cli/commit/405fa72ad7b6bbfa5d30b8fce3fc857b2020e338))
 
+### Fixed
 
-
-
+- **ci**: install pinned Rust components ([fb46fe3](https://github.com/rvben/sharepoint-cli/commit/fb46fe34e320c392f0a2b6ad87b723d9f230ff68))
+- **release**: make crates publish idempotent ([fe4459c](https://github.com/rvben/sharepoint-cli/commit/fe4459cec3e309d93b6873a57dac3329a4809d71))
 
 ## [0.0.8](https://github.com/rvben/sharepoint-cli/compare/v0.0.7...v0.0.8) - 2026-06-20
 
