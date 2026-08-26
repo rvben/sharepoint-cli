@@ -22,9 +22,9 @@ fn auth_login_errors_when_client_id_is_missing() {
 }
 
 #[test]
-fn init_errors_when_client_id_prompt_is_blank() {
-    // Feed: tenant = "contoso", client_id = "" (blank). Init should bail before
-    // touching the network or saving the config.
+fn headless_init_errors_when_client_id_is_missing() {
+    // Headless init requires explicit values and must bail before touching the
+    // network or saving config when the client ID is absent.
     let dir = tempfile::tempdir().unwrap();
 
     Command::cargo_bin("sharepoint")
@@ -34,8 +34,7 @@ fn init_errors_when_client_id_prompt_is_blank() {
         .env("HOME", dir.path())
         .env("XDG_CONFIG_HOME", dir.path())
         .env("XDG_CACHE_HOME", dir.path())
-        .args(["init"])
-        .write_stdin("contoso\n\n")
+        .args(["--tenant", "contoso", "init"])
         .assert()
         .failure()
         .stderr(contains("client_id is required"));
