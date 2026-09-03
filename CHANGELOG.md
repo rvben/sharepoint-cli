@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.0.11](https://github.com/rvben/sharepoint-cli/compare/v0.0.10...v0.0.11) - 2026-09-03
+
+### Added
+
+- **auth**: standardize authentication workflow ([f5089b7](https://github.com/rvben/sharepoint-cli/commit/f5089b7c0cfeab9837a1b539c88d07327bd4cf9e))
+
 ## [0.0.10](https://github.com/rvben/sharepoint-cli/compare/v0.0.9...v0.0.10) - 2026-08-26
 
 ### Added
