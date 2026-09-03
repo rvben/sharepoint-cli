@@ -34,6 +34,13 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                 "description": "Suppress informational messages on stderr."
             },
             {
+                "name": "--yes",
+                "short": "-y",
+                "type": "boolean",
+                "default": false,
+                "description": "Skip confirmation prompts for destructive operations."
+            },
+            {
                 "name": "--no-color",
                 "type": "boolean",
                 "default": false,
@@ -86,9 +93,10 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                     },
                     {
                         "name": "status",
-                        "description": "Show cached account info, token expiry, and scopes. Works without network access.",
+                        "description": "Verify authentication and show cached account info, token expiry, and scopes.",
                         "mutating": false,
                         "args": [
+                            {"name": "--offline", "type": "boolean", "required": false, "default": false, "description": "Inspect cached credentials without contacting Microsoft Graph."},
                             {"name": "--limit", "type": "integer", "required": false, "default": 50, "description": "Maximum number of accounts to show."},
                             {"name": "--page", "type": "string", "required": false, "description": "Opaque pagination cursor from a previous response's `next` field."},
                             {"name": "--fields", "type": "string[]", "required": false, "description": "Comma-separated fields to include (e.g. username,expires_at)."}
@@ -96,7 +104,46 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                         "output_fields": [
                             {"name": "total", "type": "integer"},
                             {"name": "next", "type": "string | null"},
+                            {"name": "items", "type": "object[]"},
+                            {"name": "verified", "type": "boolean"},
+                            {"name": "identity", "type": "object | null"}
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "profile",
+                "description": "List, select, or remove configuration profiles.",
+                "mutating": true,
+                "subcommands": [
+                    {
+                        "name": "list",
+                        "description": "List configured profiles and identify the active one.",
+                        "mutating": false,
+                        "args": [],
+                        "output_fields": [
+                            {"name": "total", "type": "integer"},
                             {"name": "items", "type": "object[]"}
+                        ]
+                    },
+                    {
+                        "name": "use",
+                        "description": "Select the default profile for future commands.",
+                        "mutating": true,
+                        "args": [{"name": "name", "type": "string", "required": true, "description": "Profile name."}],
+                        "output_fields": [
+                            {"name": "profile", "type": "string"},
+                            {"name": "active", "type": "boolean"}
+                        ]
+                    },
+                    {
+                        "name": "remove",
+                        "description": "Remove a profile and its cached credentials.",
+                        "mutating": true,
+                        "args": [{"name": "name", "type": "string", "required": true, "description": "Profile name."}],
+                        "output_fields": [
+                            {"name": "profile", "type": "string"},
+                            {"name": "removed", "type": "boolean"}
                         ]
                     }
                 ]
@@ -446,7 +493,7 @@ fn enrich_v0_3(schema: &mut Value) {
                 "read_only"
             } else if matches!(
                 name.as_str(),
-                "auth logout" | "sites use" | "files download"
+                "auth logout" | "profile use" | "profile remove" | "sites use" | "files download"
             ) {
                 "idempotent"
             } else {
@@ -479,7 +526,7 @@ fn enrich_v0_3(schema: &mut Value) {
             );
             object.insert("fields_arg".into(), json!("--fields"));
         }
-        if name == "sites use" {
+        if matches!(name.as_str(), "profile remove" | "sites use") {
             object.insert("confirmation_bypass_arg".into(), json!("--yes"));
         }
         if name == "config show" {

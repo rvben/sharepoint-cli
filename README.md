@@ -74,6 +74,17 @@ input error instead.
 
 Suite-level discovery is available without guessing: use `sharepoint doctor --offline`, `sharepoint schema --command 'files stat'`, `sharepoint config show`, and `sharepoint completions <shell>`.
 
+Authentication and profile management follow the same suite-wide commands:
+
+```sh
+sharepoint auth status
+sharepoint auth status --offline
+sharepoint profile list
+sharepoint profile use work
+sharepoint profile remove old --yes
+sharepoint config path
+```
+
 ## Configuration
 
 Config lives at `$XDG_CONFIG_HOME/sharepoint/config.toml` (or `~/.config/sharepoint/config.toml`). Run `sharepoint config path` to print the resolved location.

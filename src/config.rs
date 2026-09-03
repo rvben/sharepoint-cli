@@ -1,9 +1,9 @@
 //! Configuration: profile-based TOML at `~/.config/sharepoint/config.toml`,
 //! merged with `SHAREPOINT_*` env vars and CLI flags.
 //!
-//! There is intentionally no separate `[default]` section. The active profile
-//! is whichever block matches `[profile.<name>]`; the literal name `default`
-//! plays the special-default role.
+//! There is intentionally no separate `[default]` section. Profiles live under
+//! `[profile.<name>]`; `active_profile` selects the default when no override is
+//! provided, and the literal name `default` remains the fallback.
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -30,6 +30,8 @@ pub const DEFAULT_LOGIN_ENDPOINT: &str = "https://login.microsoftonline.com";
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ConfigFile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_profile: Option<String>,
     #[serde(default)]
     pub profile: BTreeMap<String, Profile>,
 }
@@ -150,6 +152,7 @@ pub fn resolve(
     let profile_name = profile_flag
         .map(str::to_owned)
         .or_else(|| env(ENV_PROFILE))
+        .or_else(|| file.active_profile.clone())
         .unwrap_or_else(|| DEFAULT_PROFILE.to_string());
 
     let profile = file.profile.get(&profile_name).cloned().unwrap_or_default();
@@ -183,6 +186,43 @@ pub fn resolve(
         access_token_override: env(ENV_ACCESS_TOKEN),
         refresh_token_seed: env(ENV_REFRESH_TOKEN),
     })
+}
+
+pub fn profile_summaries(file: &ConfigFile) -> Vec<serde_json::Value> {
+    file.profile
+        .iter()
+        .map(|(name, profile)| {
+            serde_json::json!({
+                "name": name,
+                "active": file.active_profile.as_deref().unwrap_or(DEFAULT_PROFILE) == name,
+                "tenant_id": profile.tenant_id,
+                "client_id": profile.client_id,
+                "default_site": profile.default_site,
+                "read_only": profile.read_only,
+            })
+        })
+        .collect()
+}
+
+pub fn use_profile(path: &Path, name: &str) -> Result<()> {
+    let mut file = load_file(path)?;
+    if !file.profile.contains_key(name) {
+        return Err(CliError::NotFound(format!("profile '{name}'")));
+    }
+    file.active_profile = Some(name.into());
+    save_file(path, &file)
+}
+
+pub fn remove_profile(path: &Path, name: &str) -> Result<Option<Profile>> {
+    let mut file = load_file(path)?;
+    let removed = file.profile.remove(name);
+    if removed.is_some() {
+        if file.active_profile.as_deref() == Some(name) {
+            file.active_profile = file.profile.keys().next().cloned();
+        }
+        save_file(path, &file)?;
+    }
+    Ok(removed)
 }
 
 #[cfg(test)]
@@ -243,6 +283,55 @@ mod tests {
         };
         let r = resolve(&ConfigFile::default(), Some("from-flag"), &env).unwrap();
         assert_eq!(r.profile_name, "from-flag");
+    }
+
+    #[test]
+    fn active_profile_is_used_below_explicit_and_environment_overrides() {
+        let mut file = ConfigFile {
+            active_profile: Some("active".into()),
+            ..ConfigFile::default()
+        };
+        file.profile.insert(
+            "active".into(),
+            Profile {
+                tenant_id: Some("active-tenant".into()),
+                ..Profile::default()
+            },
+        );
+        let resolved = resolve(&file, None, &empty_env).unwrap();
+        assert_eq!(resolved.profile_name, "active");
+        assert_eq!(resolved.tenant_id.as_deref(), Some("active-tenant"));
+
+        let env = |key: &str| (key == ENV_PROFILE).then(|| "environment".to_string());
+        assert_eq!(
+            resolve(&file, None, &env).unwrap().profile_name,
+            "environment"
+        );
+        assert_eq!(
+            resolve(&file, Some("explicit"), &env).unwrap().profile_name,
+            "explicit"
+        );
+    }
+
+    #[test]
+    fn use_and_remove_profile_update_active_selection() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let mut file = ConfigFile::default();
+        file.profile.insert("alpha".into(), Profile::default());
+        file.profile.insert("beta".into(), Profile::default());
+        save_file(&path, &file).unwrap();
+
+        use_profile(&path, "beta").unwrap();
+        assert_eq!(
+            load_file(&path).unwrap().active_profile.as_deref(),
+            Some("beta")
+        );
+
+        assert!(remove_profile(&path, "beta").unwrap().is_some());
+        let updated = load_file(&path).unwrap();
+        assert_eq!(updated.active_profile.as_deref(), Some("alpha"));
+        assert!(!updated.profile.contains_key("beta"));
     }
 
     #[test]

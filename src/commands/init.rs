@@ -52,6 +52,7 @@ pub async fn run(rt: &Runtime, args: InitArgs) -> Result<()> {
 
     let profile_name = rt.cfg.profile_name.clone();
     let mut file = rt.config_file.clone();
+    file.active_profile = Some(profile_name.clone());
     let entry = file.profile.entry(profile_name.clone()).or_default();
     entry.tenant_id = Some(tenant.clone());
     entry.client_id = Some(client_id.clone());

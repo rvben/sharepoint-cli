@@ -37,11 +37,15 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub quiet: bool,
 
+    /// Skip confirmation prompts for destructive operations.
+    #[arg(long, short = 'y', global = true)]
+    pub yes: bool,
+
     /// Disable ANSI color even on a terminal.
     #[arg(long, global = true)]
     pub no_color: bool,
 
-    /// Active config profile (default: "default"). Env: SHAREPOINT_PROFILE.
+    /// Config profile override. Env: SHAREPOINT_PROFILE; otherwise uses the active profile.
     #[arg(long, global = true, env = ENV_PROFILE)]
     pub profile: Option<String>,
 
@@ -64,6 +68,9 @@ pub enum Command {
     /// Sub-commands: login, logout, status.
     #[command(subcommand)]
     Auth(AuthCmd),
+    /// Sub-commands: list, use, remove.
+    #[command(subcommand)]
+    Profile(ProfileCmd),
     /// Sub-commands: show, path.
     #[command(subcommand)]
     Config(ConfigCmd),
@@ -100,6 +107,9 @@ pub enum AuthCmd {
     Logout,
     /// Show cached account info, expiry, scopes.
     Status {
+        /// Inspect cached credentials without contacting Microsoft Graph.
+        #[arg(long)]
+        offline: bool,
         /// Maximum number of accounts to show.
         #[arg(long, default_value_t = 50)]
         limit: usize,
@@ -110,6 +120,16 @@ pub enum AuthCmd {
         #[arg(long, value_delimiter = ',')]
         fields: Vec<String>,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProfileCmd {
+    /// List configured profiles and identify the active one.
+    List,
+    /// Select the default profile for future commands.
+    Use { name: String },
+    /// Remove a profile and its cached credentials.
+    Remove { name: String },
 }
 
 #[derive(Debug, Args)]
@@ -280,6 +300,7 @@ pub async fn run(cli: Cli) -> Result<()> {
         Command::Schema { .. } | Command::Completions { .. } => unreachable!(),
         Command::Init(args) => crate::commands::init::run(&rt, args).await,
         Command::Auth(sub) => crate::commands::auth::run(&rt, sub).await,
+        Command::Profile(sub) => crate::commands::profile::run(&rt, sub, cli.yes).await,
         Command::Config(sub) => crate::commands::config::run(&rt, sub).await,
         Command::Sites(sub) => crate::commands::sites::run(&rt, sub).await,
         Command::Drives(sub) => crate::commands::drives::run(&rt, sub).await,

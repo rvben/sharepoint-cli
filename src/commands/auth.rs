@@ -2,20 +2,22 @@
 
 use chrono::{Duration, Utc};
 
-use crate::auth::{device_code, require_client_id, token_cache};
+use crate::auth::{AuthContext, device_code, require_client_id, token_cache};
 use crate::cli::{AuthCmd, Runtime};
 use crate::config;
 use crate::error::{CliError, Result};
+use crate::graph::GraphClient;
 
 pub async fn run(rt: &Runtime, cmd: AuthCmd) -> Result<()> {
     match cmd {
         AuthCmd::Login => login(rt).await,
         AuthCmd::Logout => logout(rt).await,
         AuthCmd::Status {
+            offline,
             limit,
             page,
             fields,
-        } => status(rt, limit, page.as_deref(), &fields).await,
+        } => status(rt, offline, limit, page.as_deref(), &fields).await,
     }
 }
 
@@ -120,7 +122,13 @@ async fn logout(rt: &Runtime) -> Result<()> {
     Ok(())
 }
 
-async fn status(rt: &Runtime, limit: usize, _page: Option<&str>, fields: &[String]) -> Result<()> {
+async fn status(
+    rt: &Runtime,
+    offline: bool,
+    limit: usize,
+    _page: Option<&str>,
+    fields: &[String],
+) -> Result<()> {
     let cache = token_cache::load(&rt.cache_path)?;
 
     // Build the full account list.
@@ -148,12 +156,23 @@ async fn status(rt: &Runtime, limit: usize, _page: Option<&str>, fields: &[Strin
 
     let total = all_accounts.len();
     all_accounts.truncate(limit);
+    let identity = if offline || total == 0 {
+        None
+    } else {
+        Some(
+            GraphClient::new(AuthContext::new(rt.cfg.clone(), rt.cache_path.clone()))
+                .get_json::<serde_json::Value>("/me?$select=id,displayName,userPrincipalName")
+                .await?,
+        )
+    };
 
     if rt.out.json {
         rt.out.print_json(&serde_json::json!({
             "total": total,
             "next": serde_json::Value::Null,
             "items": all_accounts,
+            "verified": identity.is_some(),
+            "identity": identity,
         }));
     } else {
         // Always emit at least the column header so stdout is non-empty in text mode.

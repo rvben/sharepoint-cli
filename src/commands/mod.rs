@@ -9,5 +9,6 @@ pub(crate) mod doctor;
 pub(crate) mod drives;
 pub(crate) mod files;
 pub(crate) mod init;
+pub(crate) mod profile;
 pub(crate) mod schema;
 pub(crate) mod sites;

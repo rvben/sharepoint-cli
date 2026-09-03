@@ -33,8 +33,9 @@ fn auth_status_prints_cached_account() {
         .env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")
-        .args(["--output", "json", "auth", "status"])
+        .args(["--output", "json", "auth", "status", "--offline"])
         .assert()
         .success()
-        .stdout(contains("alice@contoso.com"));
+        .stdout(contains("alice@contoso.com"))
+        .stdout(contains("\"verified\": false"));
 }
