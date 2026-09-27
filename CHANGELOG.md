@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.0.12](https://github.com/rvben/sharepoint-cli/compare/v0.0.11...v0.0.12) - 2026-09-27
+
+### Fixed
+
+- **deps**: update rustls to 0.23.45 for RUSTSEC-2026-0285 ([4ab30be](https://github.com/rvben/sharepoint-cli/commit/4ab30be8bde54549d7b2a9386af8f8c93ac9bfa1))
+
 ## [0.0.11](https://github.com/rvben/sharepoint-cli/compare/v0.0.10...v0.0.11) - 2026-09-03
 
 ### Added
