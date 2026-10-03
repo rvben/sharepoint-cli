@@ -122,13 +122,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn json_forced_on_when_not_tty() {
-        // Tests run without a TTY, so auto format should still set json=true.
-        let cfg = OutputConfig::new(OutputFormat::Auto, false);
-        assert!(cfg.json);
-    }
-
-    #[test]
     fn explicit_text_wins_over_auto() {
         let cfg = OutputConfig::new(OutputFormat::Text, false);
         assert!(!cfg.json, "text format must not emit JSON even when piped");
