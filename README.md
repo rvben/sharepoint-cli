@@ -4,6 +4,12 @@ Agent-friendly SharePoint Online CLI with JSON output, structured exit codes, an
 
 ## Install
 
+### Homebrew
+
+```sh
+brew install rvben/tap/sharepoint-cli
+```
+
 ### From crates.io
 
 ```sh
