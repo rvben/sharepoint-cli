@@ -5,7 +5,7 @@
 //! immediately prompting for a device-code login.  This enables headless/CI
 //! usage without persistent cache files.
 
-use assert_cmd::Command;
+mod support;
 use predicates::str::contains;
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -42,13 +42,7 @@ async fn env_refresh_token_bootstraps_auth_when_no_cache() {
 
     let dir = tempfile::tempdir().unwrap();
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
-        .env("XDG_CONFIG_HOME", dir.path())
-        .env("XDG_CACHE_HOME", dir.path())
+    support::isolated_command(dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")
         .env("SHAREPOINT_REFRESH_TOKEN", "ENV-RT")
@@ -78,13 +72,7 @@ async fn env_refresh_token_fails_with_auth_error_on_invalid_grant() {
 
     let dir = tempfile::tempdir().unwrap();
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
-        .env("XDG_CONFIG_HOME", dir.path())
-        .env("XDG_CACHE_HOME", dir.path())
+    support::isolated_command(dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")
         .env("SHAREPOINT_REFRESH_TOKEN", "REVOKED-RT")

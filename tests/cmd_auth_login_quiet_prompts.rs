@@ -4,7 +4,7 @@
 //! The device-code prompt is an interactive instruction, not optional status.
 //! Suppressing it under --quiet would hang the user silently.
 
-use assert_cmd::Command;
+mod support;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde_json::json;
@@ -54,13 +54,7 @@ async fn auth_login_quiet_still_shows_device_code_prompt_on_stderr() {
     let server = setup_server("t1").await;
     let dir = tempfile::tempdir().unwrap();
 
-    let output = Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        // Isolate native home paths as well as the explicit XDG overrides.
-        .env("HOME", dir.path())
-        .env("XDG_CONFIG_HOME", dir.path())
-        .env("XDG_CACHE_HOME", dir.path())
+    let output = support::isolated_command(dir.path())
         .env("MICROSOFT_LOGIN_ENDPOINT", server.uri())
         .env("SHAREPOINT_TENANT_ID", "t1")
         .env("SHAREPOINT_CLIENT_ID", "cid-1")
@@ -89,12 +83,7 @@ async fn auth_login_json_quiet_shows_prompt_on_stderr_not_stdout() {
     let server = setup_server("t2").await;
     let dir = tempfile::tempdir().unwrap();
 
-    let output = Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        .env("HOME", dir.path())
-        .env("XDG_CONFIG_HOME", dir.path())
-        .env("XDG_CACHE_HOME", dir.path())
+    let output = support::isolated_command(dir.path())
         .env("MICROSOFT_LOGIN_ENDPOINT", server.uri())
         .env("SHAREPOINT_TENANT_ID", "t2")
         .env("SHAREPOINT_CLIENT_ID", "cid-2")
