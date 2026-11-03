@@ -192,6 +192,45 @@ impl RestClient {
         serde_json::from_str(&text)
             .map_err(|e| CliError::Other(format!("parse SharePoint response: {e}")))
     }
+
+    /// Read every page of a nometadata collection. Continuations are resolved
+    /// against the current response URL and pass the same origin guard as GETs.
+    pub(crate) async fn get_collection<T: DeserializeOwned>(&self, url: &str) -> Result<Vec<T>> {
+        let mut next = url.to_string();
+        let mut seen = std::collections::HashSet::new();
+        let mut values = Vec::new();
+        loop {
+            let mut current = url::Url::parse(&next).map_err(|e| {
+                CliError::Other(format!("invalid SharePoint continuation URL: {e}"))
+            })?;
+            current.set_fragment(None);
+            if !seen.insert(current.to_string()) {
+                return Err(CliError::Other(
+                    "SharePoint collection repeated a continuation URL".into(),
+                ));
+            }
+            let page: Collection<T> = self.get_json(current.as_str()).await?;
+            values.extend(page.value);
+            match page.next {
+                None => return Ok(values),
+                Some(link) => {
+                    next = current
+                        .join(&link)
+                        .map_err(|e| {
+                            CliError::Other(format!("invalid SharePoint continuation URL: {e}"))
+                        })?
+                        .to_string();
+                }
+            }
+        }
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct Collection<T> {
+    value: Vec<T>,
+    #[serde(rename = "odata.nextLink", alias = "@odata.nextLink", default)]
+    next: Option<String>,
 }
 
 /// The signed-in user, from `/_api/web/currentuser`.

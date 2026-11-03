@@ -1,0 +1,77 @@
+{
+  "sites": [
+    {
+      "id": "marketing-web",
+      "name": "Marketing",
+      "host": "simulator.sharepoint.com",
+      "path": "/sites/Marketing",
+      "libraries": [
+        {
+          "id": "marketing-documents",
+          "name": "Documents",
+          "root": "Shared Documents",
+          "template": 101,
+          "folders": ["Plans", "Empty", "Forms"],
+          "files": [
+            {"path": "hello.txt", "content": "Hello from the SharePoint simulator!\n"},
+            {"path": "Plans/Q4 plan.txt", "content": "Plan: exercise listing, metadata, and downloads.\n"},
+            {"path": "O'Brien #1 %.txt", "content": "Unicode download: café 🧪\n"}
+          ]
+        },
+        {
+          "id": "marketing-archive",
+          "name": "Archive",
+          "root": "Archive",
+          "template": 101,
+          "folders": [],
+          "files": [
+            {"path": "old.txt", "content": "Archived fixture.\n"},
+            {"path": "locked.txt", "content": "Metadata is visible; the simulated download is blocked.\n"}
+          ]
+        },
+        {"id": "tasks-list", "name": "Tasks", "root": "Lists/Tasks", "template": 100},
+        {"id": "hidden-documents", "name": "Hidden documents", "root": "Hidden", "template": 101, "hidden": true}
+      ]
+    },
+    {
+      "id": "engineering-web",
+      "name": "Engineering",
+      "host": "simulator.sharepoint.com",
+      "path": "/sites/Engineering",
+      "libraries": [
+        {
+          "id": "engineering-documents",
+          "name": "Documents",
+          "root": "Shared Documents",
+          "template": 101,
+          "folders": [],
+          "files": [{"path": "readme.txt", "content": "Engineering fixture.\n"}]
+        }
+      ]
+    },
+    {
+      "id": "personal-web",
+      "name": "Simulator OneDrive",
+      "host": "simulator-my.sharepoint.com",
+      "path": "/personal/simulator",
+      "libraries": [
+        {
+          "id": "personal-documents",
+          "name": "Documents",
+          "root": "Documents",
+          "template": 700,
+          "folders": [],
+          "files": [{"path": "personal.txt", "content": "OneDrive fixture.\n"}]
+        }
+      ]
+    }
+  ],
+  "faults": [
+    {
+      "resource": "/sites/Marketing/Archive/locked.txt",
+      "operation": "download",
+      "status": 403,
+      "message": "Download blocked for this resource."
+    }
+  ]
+}

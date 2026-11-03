@@ -1,0 +1,36 @@
+{
+  "repository": "https://github.com/pnp/pnpcore",
+  "commit": "aba47bf58400a26ac7220997017be36d54d501fe",
+  "sources": {
+    "identity": {
+      "url": "https://raw.githubusercontent.com/pnp/pnpcore/aba47bf58400a26ac7220997017be36d54d501fe/src/sdk/PnP.Core.Test/SharePoint/MockData/WebTests/GetWebCurrentUserTest-0-00002.response.json",
+      "sha256": "156d13a5e27e5ed6819ce20967b0aa6922b52b6c5c26b46d43bf4e00b07fc81d",
+      "status": 200
+    },
+    "file": {
+      "url": "https://raw.githubusercontent.com/pnp/pnpcore/aba47bf58400a26ac7220997017be36d54d501fe/src/sdk/PnP.Core.Test/SharePoint/MockData/FilesTests/GetFileByServerRelativeUrlTest-0-00004.response.json",
+      "sha256": "9567b66853e74180eb96c070bdb0b730c8480f53abc2325ab9b9b8cf84d628ac",
+      "status": 200
+    },
+    "folder": {
+      "url": "https://raw.githubusercontent.com/pnp/pnpcore/aba47bf58400a26ac7220997017be36d54d501fe/src/sdk/PnP.Core.Test/SharePoint/MockData/FoldersTests/GetFolderByServerRelativeUrlTest-0-00002.response.json",
+      "sha256": "b5763e529ae3fd2374bcea4c1fe72745e485791b01eda8de5bdad83e28f4139d",
+      "status": 200
+    },
+    "missing": {
+      "url": "https://raw.githubusercontent.com/pnp/pnpcore/aba47bf58400a26ac7220997017be36d54d501fe/src/sdk/PnP.Core.Test/SharePoint/MockData/FoldersTests/GetFolderById_NonExistentFolder_ShouldThrowCorrectException-0-00002.response.json",
+      "sha256": "f2754f69d20600acfa918bb3810d6263b04952b2c9164567db9e50f3c08c53dd",
+      "status": 404
+    },
+    "search_first": {
+      "url": "https://raw.githubusercontent.com/pnp/pnpcore/aba47bf58400a26ac7220997017be36d54d501fe/src/sdk/PnP.Core.Test/SharePoint/MockData/WebTests/SearchSortingPagingTest-0-00002.response.json",
+      "sha256": "21c09efbfffa1a537acb2e3224683c3c5a802a6b9ba4f2da1ae039ce13ae4d42",
+      "status": 200
+    },
+    "search_second": {
+      "url": "https://raw.githubusercontent.com/pnp/pnpcore/aba47bf58400a26ac7220997017be36d54d501fe/src/sdk/PnP.Core.Test/SharePoint/MockData/WebTests/SearchSortingPagingTest-0-00003.response.json",
+      "sha256": "6fe21462defcfa742b16862883a1ed5e469320a78f7b1798c5ed9b48909d4836",
+      "status": 200
+    }
+  }
+}

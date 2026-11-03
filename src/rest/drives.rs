@@ -12,11 +12,6 @@ use crate::graph::drives::{Drive, DriveItem, File, Folder, ListChildrenResult, P
 use crate::graph::sites::Site;
 
 #[derive(Deserialize)]
-struct ListsResponse {
-    value: Vec<List>,
-}
-
-#[derive(Deserialize)]
 struct List {
     #[serde(rename = "Id")]
     id: String,
@@ -32,11 +27,6 @@ struct List {
 struct RootFolder {
     #[serde(rename = "ServerRelativeUrl")]
     server_relative_url: String,
-}
-
-#[derive(Deserialize)]
-struct Collection<T> {
-    value: Vec<T>,
 }
 
 #[derive(Deserialize)]
@@ -103,9 +93,8 @@ pub(crate) async fn list_drives(client: &RestClient, site: &Site) -> Result<Vec<
         &site.web_url,
         "/_api/web/lists?$filter=(BaseTemplate%20eq%20101%20or%20BaseTemplate%20eq%20700)%20and%20Hidden%20eq%20false&$select=Id,Title,BaseTemplate,RootFolder/ServerRelativeUrl&$expand=RootFolder",
     )?;
-    let resp: ListsResponse = client.get_json(&url).await?;
-    Ok(resp
-        .value
+    let lists: Vec<List> = client.get_collection(&url).await?;
+    Ok(lists
         .into_iter()
         .map(|l| Drive {
             id: l.id,
@@ -224,10 +213,8 @@ fn folder_api(client: &RestClient, site: &Site, server_relative: &str) -> Result
     )
 }
 
-/// One "page" of children. REST returns all folders and files of a folder in
-/// one response each, so `next_url` is always `None`. `fetched_url` is the
-/// folder URL; passing it back as `page_url` re-lists the same folder (used
-/// by mid-page `--limit` cursors).
+/// Assemble a folder's children from every REST collection page. `fetched_url`
+/// remains the folder URL so CLI cursors can resume within the combined result.
 pub(crate) async fn list_children(
     client: &RestClient,
     site: &Site,
@@ -239,19 +226,18 @@ pub(crate) async fn list_children(
         Some(u) => u.to_string(),
         None => folder_api(client, site, &server_relative(drive, path)?)?,
     };
-    let folders: Collection<RestFolder> = client
-        .get_json(&format!("{folder_url}/Folders?$select={FOLDER_SELECT}"))
+    let folders: Vec<RestFolder> = client
+        .get_collection(&format!("{folder_url}/Folders?$select={FOLDER_SELECT}"))
         .await?;
-    let files: Collection<RestFile> = client
-        .get_json(&format!("{folder_url}/Files?$select={FILE_SELECT}"))
+    let files: Vec<RestFile> = client
+        .get_collection(&format!("{folder_url}/Files?$select={FILE_SELECT}"))
         .await?;
     let mut items: Vec<DriveItem> = folders
-        .value
         .into_iter()
         .filter(|f| !is_library_forms_folder(drive, f))
         .map(|f| folder_item(client, drive, f))
         .collect();
-    items.extend(files.value.into_iter().map(|f| file_item(client, drive, f)));
+    items.extend(files.into_iter().map(|f| file_item(client, drive, f)));
     Ok(ListChildrenResult {
         items,
         next_url: None,

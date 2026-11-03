@@ -1,0 +1,2357 @@
+{
+  "recording": {
+    "host": "simulator.sharepoint.com",
+    "source": "Sanitized/projected PnP Core SDK server-response recordings at aba47bf58400a26ac7220997017be36d54d501fe; synthetic routing and setup. See contracts/README.md and provenance.json. Not a live CLI capture.",
+    "exchanges": [
+      {
+        "path": "/sites/Marketing/_api/web",
+        "query": {
+          "$select": "Id,Title,Url"
+        },
+        "status": 200,
+        "body": {
+          "Id": "00000000-0000-4000-8000-000000000002",
+          "Title": "Marketing",
+          "Url": "https://simulator.sharepoint.com/sites/Marketing"
+        }
+      },
+      {
+        "path": "/sites/Marketing/_api/web/lists",
+        "query": {
+          "$filter": "(BaseTemplate eq 101 or BaseTemplate eq 700) and Hidden eq false",
+          "$select": "Id,Title,BaseTemplate,RootFolder/ServerRelativeUrl",
+          "$expand": "RootFolder"
+        },
+        "status": 200,
+        "body": {
+          "value": [
+            {
+              "Id": "00000000-0000-4000-8000-000000000001",
+              "Title": "Documents",
+              "BaseTemplate": 101,
+              "RootFolder": {
+                "ServerRelativeUrl": "/sites/Marketing/Shared Documents"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": "/_api/web/currentuser",
+        "query": {
+          "$select": "Title,Email,LoginName"
+        },
+        "status": 200,
+        "body": {
+          "Title": "Recorded User",
+          "Email": "recorded@example.test",
+          "LoginName": "i:0#.f|membership|recorded@example.test"
+        }
+      },
+      {
+        "path": "/sites/Marketing/_api/web/GetFileByServerRelativePath(decodedurl='/sites/Marketing/Shared%20Documents/hello.txt')",
+        "query": {
+          "$select": "UniqueId,Name,ServerRelativeUrl,Length,ETag,TimeCreated,TimeLastModified"
+        },
+        "status": 200,
+        "body": {
+          "UniqueId": "00000000-0000-4000-8000-000000000003",
+          "Name": "hello.txt",
+          "ServerRelativeUrl": "/sites/Marketing/Shared Documents/hello.txt",
+          "Length": "19824",
+          "ETag": "\"{00000000-0000-4000-8000-000000000003},1\"",
+          "TimeCreated": "2024-03-29T17:56:36Z",
+          "TimeLastModified": "2024-03-29T17:56:36Z"
+        }
+      },
+      {
+        "path": "/sites/Marketing/_api/web/GetFileByServerRelativePath(decodedurl='/sites/Marketing/Shared%20Documents/Plans')",
+        "query": {
+          "$select": "UniqueId,Name,ServerRelativeUrl,Length,ETag,TimeCreated,TimeLastModified"
+        },
+        "status": 404,
+        "body": {
+          "odata.error": {
+            "code": "-2147024894, System.IO.FileNotFoundException",
+            "message": {
+              "lang": "en-US",
+              "value": "File Not Found."
+            }
+          }
+        }
+      },
+      {
+        "path": "/sites/Marketing/_api/web/GetFileByServerRelativePath(decodedurl='/sites/Marketing/Shared%20Documents/missing.txt')",
+        "query": {
+          "$select": "UniqueId,Name,ServerRelativeUrl,Length,ETag,TimeCreated,TimeLastModified"
+        },
+        "status": 404,
+        "body": {
+          "odata.error": {
+            "code": "-2147024894, System.IO.FileNotFoundException",
+            "message": {
+              "lang": "en-US",
+              "value": "File Not Found."
+            }
+          }
+        }
+      },
+      {
+        "path": "/sites/Marketing/_api/web/GetFolderByServerRelativePath(decodedurl='/sites/Marketing/Shared%20Documents/Plans')",
+        "query": {
+          "$select": "UniqueId,Name,ServerRelativeUrl,TimeCreated,TimeLastModified"
+        },
+        "status": 200,
+        "body": {
+          "UniqueId": "00000000-0000-4000-8000-000000000004",
+          "Name": "Plans",
+          "ServerRelativeUrl": "/sites/Marketing/Shared Documents/Plans",
+          "TimeCreated": "2021-09-11T23:42:33Z",
+          "TimeLastModified": "2023-08-25T09:15:16Z"
+        }
+      },
+      {
+        "path": "/sites/Marketing/_api/web/GetFolderByServerRelativePath(decodedurl='/sites/Marketing/Shared%20Documents/missing.txt')",
+        "query": {
+          "$select": "UniqueId,Name,ServerRelativeUrl,TimeCreated,TimeLastModified"
+        },
+        "status": 404,
+        "body": {
+          "odata.error": {
+            "code": "-2147024894, System.IO.FileNotFoundException",
+            "message": {
+              "lang": "en-US",
+              "value": "File Not Found."
+            }
+          }
+        }
+      },
+      {
+        "path": "/_api/search/query",
+        "query": {
+          "querytext": "'(*) path:\"https://simulator.sharepoint.com/sites/Marketing/Shared Documents\" IsDocument:1'",
+          "selectproperties": "'Title,Path,FileName,Size,LastModifiedTime,UniqueId'",
+          "rowlimit": "50",
+          "startrow": "0"
+        },
+        "status": 200,
+        "body": {
+          "PrimaryQueryResult": {
+            "RelevantResults": {
+              "RowCount": 10,
+              "TotalRows": 13105,
+              "TotalRowsIncludingDuplicates": 13105,
+              "Table": {
+                "Rows": [
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-01.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-01.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 01",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_1_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "1",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000065",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-01.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-02.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-02.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 02",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_2_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "2",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000066",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-02.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-03.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-03.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 03",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_3_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "3",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000067",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-03.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-04.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-04.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 04",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_4_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "4",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000068",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-04.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-05.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-05.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 05",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_5_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "5",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000069",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-05.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-06.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-06.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 06",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_6_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "6",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-00000000006a",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-06.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-07.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-07.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 07",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_7_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "7",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-00000000006b",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-07.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-08.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-08.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 08",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_8_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "8",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-00000000006c",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-08.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-09.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-09.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 09",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_9_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "9",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-00000000006d",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-09.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-10.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-10.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 10",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_10_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "10",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-00000000006e",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-10.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "path": "/_api/search/query",
+        "query": {
+          "querytext": "'(*) path:\"https://simulator.sharepoint.com/sites/Marketing/Shared Documents\" IsDocument:1'",
+          "selectproperties": "'Title,Path,FileName,Size,LastModifiedTime,UniqueId'",
+          "rowlimit": "50",
+          "startrow": "10"
+        },
+        "status": 200,
+        "body": {
+          "PrimaryQueryResult": {
+            "RelevantResults": {
+              "RowCount": 10,
+              "TotalRows": 13105,
+              "TotalRowsIncludingDuplicates": 13105,
+              "Table": {
+                "Rows": [
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-11.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-11.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 11",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_11_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "11",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-00000000006f",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-11.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-12.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-12.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 12",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_12_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "12",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000070",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-12.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-13.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-13.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 13",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_13_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "13",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000071",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-13.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-14.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-14.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 14",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_14_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "14",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000072",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-14.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-15.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-15.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 15",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_15_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "15",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000073",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-15.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-16.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-16.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 16",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_16_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "16",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000074",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-16.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-17.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-17.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 17",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_17_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "17",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000075",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-17.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-18.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-18.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 18",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_18_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "18",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000076",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-18.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-19.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-19.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 19",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_19_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "19",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000077",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-19.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  },
+                  {
+                    "Cells": [
+                      {
+                        "Key": "Path",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-20.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Url",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-20.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "Title",
+                        "Value": "Result 20",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ListId",
+                        "Value": "00000000-0000-4000-8000-000000000001",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeIdList",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ResultTypeId",
+                        "Value": "0",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "RenderTemplateId",
+                        "Value": "~sitecollection/_catalogs/masterpage/Display Templates/Search/Item_Default.js",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "piSearchResultId",
+                        "Value": "0_20_1_1",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "DocId",
+                        "Value": "20",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Rank",
+                        "Value": "1.0",
+                        "ValueType": "Edm.Double"
+                      },
+                      {
+                        "Key": "GeoLocationSource",
+                        "Value": "EMEA",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "SiteId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "UniqueId",
+                        "Value": "00000000-0000-4000-8000-000000000078",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "WebId",
+                        "Value": "00000000-0000-4000-8000-000000000002",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "contentclass",
+                        "Value": "STS_ListItem_DocumentLibrary",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "IsExternalContent",
+                        "Value": "false",
+                        "ValueType": "Edm.Boolean"
+                      },
+                      {
+                        "Key": "PartitionId",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "UrlZone",
+                        "Value": "0",
+                        "ValueType": "Edm.Int64"
+                      },
+                      {
+                        "Key": "Culture",
+                        "Value": null,
+                        "ValueType": "Null"
+                      },
+                      {
+                        "Key": "OriginalPath",
+                        "Value": "https://simulator.sharepoint.com/sites/Marketing/Shared Documents/result-20.txt",
+                        "ValueType": "Edm.String"
+                      },
+                      {
+                        "Key": "ModifiedBy",
+                        "Value": "Recorded User",
+                        "ValueType": "Edm.String"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

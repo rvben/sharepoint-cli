@@ -218,8 +218,10 @@ MIT
 
 ## Testing
 
-See [the testing guide](docs/testing.md) for automated checks and a live
-SharePoint/OneDrive smoke test using a dedicated test tenant.
+Run `make test-simulator` for repeatable local REST smoke tests with dummy data,
+or `make simulator` to explore the fixtures interactively. No tenant or login is
+needed. See [the testing guide](docs/testing.md) for scenarios, custom fixtures,
+and live SharePoint/OneDrive testing.
 
 ## Releasing
 

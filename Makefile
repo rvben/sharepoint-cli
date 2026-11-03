@@ -1,4 +1,4 @@
-.PHONY: build release test test-e2e lint fmt fmt-check check clean install release-patch release-minor release-major
+.PHONY: build release test test-e2e test-simulator simulator lint fmt fmt-check check clean install release-patch release-minor release-major
 
 build:
 	cargo build
@@ -17,6 +17,13 @@ test:
 # SHAREPOINT_E2E_SITE, SHAREPOINT_E2E_LIBRARY.
 test-e2e:
 	cargo nextest run --test e2e
+
+# No tenant, credentials, browser, or network access beyond loopback required.
+simulator:
+	cargo run --example simulator -- serve
+
+test-simulator: build
+	cargo run --example simulator -- smoke --cli target/debug/sharepoint
 
 lint:
 	cargo clippy --all-targets -- -D warnings

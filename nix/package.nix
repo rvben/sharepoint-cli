@@ -18,6 +18,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
       ../Cargo.lock
       ../src
       ../tests
+      ../examples
       ../README.md
     ];
   };
