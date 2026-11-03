@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.0](https://github.com/rvben/sharepoint-cli/compare/v0.0.14...v0.1.0) - 2026-11-03
+
+### Added
+
+- harden downloads and automation across platforms ([f89f433](https://github.com/rvben/sharepoint-cli/commit/f89f433e24a6bcc388d8fd89f0929244a178f430))
+
 ## [0.0.14](https://github.com/rvben/sharepoint-cli/compare/v0.0.13...v0.0.14) - 2026-11-03
 
 ### Added
