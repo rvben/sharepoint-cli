@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.0.14](https://github.com/rvben/sharepoint-cli/compare/v0.0.13...v0.0.14) - 2026-11-03
+
+### Added
+
+- **testing**: add reusable SharePoint REST simulator ([3962a14](https://github.com/rvben/sharepoint-cli/commit/3962a142fd9fcd57cf8445b2c980754c21e6e18a))
+
+### Fixed
+
+- **config**: honor XDG paths across platforms ([45c0804](https://github.com/rvben/sharepoint-cli/commit/45c08049b82b2f7f5c2c09030d9e78a47d45573d))
+
 ## [0.0.13](https://github.com/rvben/sharepoint-cli/compare/v0.0.12...v0.0.13) - 2026-11-03
 
 ### Added
