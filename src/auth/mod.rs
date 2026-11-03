@@ -28,7 +28,9 @@ use tokio::sync::{Mutex, Notify};
 use crate::config::ResolvedConfig;
 use crate::error::{CliError, Result};
 
+pub(crate) mod browser;
 pub mod device_code;
+pub mod session_store;
 pub mod token_cache;
 
 const REFRESH_MARGIN_SECS: i64 = 60;
@@ -278,6 +280,8 @@ mod tests {
             debug_http: false,
             access_token_override: Some("ENV-TOKEN".into()),
             refresh_token_seed: None,
+            backend: crate::config::BackendKind::Graph,
+            rest: crate::config::RestConfig::default(),
         };
         let ctx = AuthContext::new(cfg, dir.path().join("tokens.json"));
         assert_eq!(ctx.access_token().await.unwrap(), "ENV-TOKEN");
@@ -298,6 +302,8 @@ mod tests {
             debug_http: false,
             access_token_override: None,
             refresh_token_seed: None,
+            backend: crate::config::BackendKind::Graph,
+            rest: crate::config::RestConfig::default(),
         };
         let ctx = AuthContext::new(cfg, dir.path().join("tokens.json"));
         let err = ctx.access_token().await.unwrap_err();

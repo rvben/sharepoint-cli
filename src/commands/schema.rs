@@ -73,35 +73,40 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                 "subcommands": [
                     {
                         "name": "login",
-                        "description": "Run the device-code flow and cache the resulting tokens.",
+                        "description": "Sign in: device-code flow (graph backend) or interactive browser (rest backend).",
                         "mutating": true,
                         "args": [],
                         "output_fields": [
                             {"name": "username", "type": "string"},
                             {"name": "name", "type": "string"},
-                            {"name": "tenant_id", "type": "string"}
+                            {"name": "tenant_id", "type": "string"},
+                            {"name": "backend", "type": "string", "description": "(rest backend only)"},
+                            {"name": "host", "type": "string", "description": "(rest backend only)"}
                         ]
                     },
                     {
                         "name": "logout",
-                        "description": "Delete cached tokens for the active profile.",
+                        "description": "Sign out: delete cached tokens (graph backend) or the stored browser session (rest backend).",
                         "mutating": true,
                         "args": [],
                         "output_fields": [
-                            {"name": "removed", "type": "integer"}
+                            {"name": "removed", "type": "integer"},
+                            {"name": "backend", "type": "string", "description": "(rest backend only)"},
+                            {"name": "host", "type": "string", "description": "(rest backend only)"}
                         ]
                     },
                     {
                         "name": "status",
-                        "description": "Verify authentication and show cached account info, token expiry, and scopes.",
+                        "description": "Show cached credentials (graph: accounts, expiry, scopes; rest: browser session) and verify them.",
                         "mutating": false,
                         "args": [
-                            {"name": "--offline", "type": "boolean", "required": false, "default": false, "description": "Inspect cached credentials without contacting Microsoft Graph."},
-                            {"name": "--limit", "type": "integer", "required": false, "default": 50, "description": "Maximum number of accounts to show."},
+                            {"name": "--offline", "type": "boolean", "required": false, "default": false, "description": "Inspect cached credentials without contacting SharePoint or Microsoft Graph."},
+                            {"name": "--limit", "type": "integer", "required": false, "default": 50, "description": "Maximum number of accounts to show (graph backend only)."},
                             {"name": "--page", "type": "string", "required": false, "description": "Opaque pagination cursor from a previous response's `next` field."},
-                            {"name": "--fields", "type": "string[]", "required": false, "description": "Comma-separated fields to include (e.g. username,expires_at)."}
+                            {"name": "--fields", "type": "string[]", "required": false, "description": "Comma-separated item fields to include (e.g. username,expires_at; rest backend: host,username,captured_at)."}
                         ],
                         "output_fields": [
+                            {"name": "backend", "type": "string", "description": "(rest backend only)"},
                             {"name": "total", "type": "integer"},
                             {"name": "next", "type": "string | null"},
                             {"name": "items", "type": "object[]"},
@@ -138,7 +143,7 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                     },
                     {
                         "name": "remove",
-                        "description": "Remove a profile and its cached credentials.",
+                        "description": "Remove a profile and its cached Graph tokens.",
                         "mutating": true,
                         "args": [{"name": "name", "type": "string", "required": true, "description": "Profile name."}],
                         "output_fields": [
@@ -167,6 +172,10 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                             {"name": "site_aliases", "type": "object", "description": "Map of alias names to site URLs or names."},
                             {"name": "graph_endpoint", "type": "string", "description": "Microsoft Graph API base URL."},
                             {"name": "login_endpoint", "type": "string", "description": "Azure AD login base URL."},
+                            {"name": "backend", "type": "string", "description": "API backend: graph or rest."},
+                            {"name": "sharepoint_host", "type": "string | null", "description": "SharePoint tenant host used by the rest backend."},
+                            {"name": "rest_endpoint", "type": "string | null", "description": "Base URL for SharePoint REST calls."},
+                            {"name": "session_path", "type": "string", "description": "Absolute path to the browser session store."},
                             {"name": "config_path", "type": "string", "description": "Absolute path to the resolved config file."},
                             {"name": "cache_path", "type": "string", "description": "Absolute path to the token cache directory."}
                         ]
@@ -181,7 +190,7 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
             },
             {
                 "name": "init",
-                "description": "Interactive setup: write a config profile and run the first device-code login.",
+                "description": "Interactive setup: write a config profile and sign in (device code for graph, browser for rest).",
                 "mutating": true,
                 "args": [],
                 "output_fields": [
@@ -209,10 +218,10 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                 "subcommands": [
                     {
                         "name": "list",
-                        "description": "List followed sites (default) or search by query.",
+                        "description": "Without --query: followed sites (graph) or all sites via search (rest); with --query: search.",
                         "mutating": false,
                         "args": [
-                            {"name": "--query", "type": "string", "required": false, "description": "Search query; omit to list followed sites."},
+                            {"name": "--query", "type": "string", "required": false, "description": "Search query; omit to list followed sites (graph) or all sites via search (rest)."},
                             {"name": "--limit", "type": "integer", "required": false, "default": 50, "description": "Maximum number of items to return."},
                             {"name": "--offset", "type": "integer", "required": false, "default": 0, "description": "Number of items to skip (applied client-side)."},
                             {"name": "--all", "type": "boolean", "required": false, "default": false, "description": "Fetch all pages (ignores --limit)."},
@@ -376,13 +385,13 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                 "kind": "api_error",
                 "exit_code": 5,
                 "retryable": false,
-                "description": "Microsoft Graph API returned a non-2xx response."
+                "description": "The remote API (Graph or SharePoint REST) returned a non-2xx response."
             },
             {
                 "kind": "rate_limit",
                 "exit_code": 6,
                 "retryable": true,
-                "description": "Too many requests; Microsoft Graph is rate-limiting this client."
+                "description": "Too many requests; Microsoft 365 is rate-limiting this client."
             },
             {
                 "kind": "unexpected_error",
@@ -461,11 +470,11 @@ fn enrich_v0_3(schema: &mut Value) {
     }
     commands.push(json!({
         "name":"doctor",
-        "description":"Check configuration, credential cache, and Graph access.",
+        "description":"Check configuration, credentials, and Microsoft Graph or SharePoint REST access.",
         "mutating":false,
         "effects":"read_only",
         "cardinality":"single",
-        "args":[{"name":"--offline","type":"boolean","description":"Skip the Microsoft Graph connectivity check"}],
+        "args":[{"name":"--offline","type":"boolean","description":"Skip the network connectivity check"}],
         "output_fields":[{"name":"checks","type":"array","items":{"type":"object"}},{"name":"healthy","type":"boolean"}]
     }));
     commands.push(json!({

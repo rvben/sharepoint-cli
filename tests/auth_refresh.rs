@@ -57,6 +57,8 @@ async fn access_token_refreshes_when_within_60s_of_expiry() {
         debug_http: false,
         access_token_override: None,
         refresh_token_seed: None,
+        backend: sharepoint_cli::config::BackendKind::Graph,
+        rest: sharepoint_cli::config::RestConfig::default(),
     };
     let ctx = AuthContext::new(cfg, cache_path.clone());
     let tok = ctx.access_token().await.unwrap();

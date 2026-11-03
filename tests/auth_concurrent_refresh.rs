@@ -61,6 +61,8 @@ async fn concurrent_access_token_calls_trigger_exactly_one_refresh() {
         debug_http: false,
         access_token_override: None,
         refresh_token_seed: None,
+        backend: sharepoint_cli::config::BackendKind::Graph,
+        rest: sharepoint_cli::config::RestConfig::default(),
     };
     let ctx = Arc::new(AuthContext::new(cfg, cache_path));
 

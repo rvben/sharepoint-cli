@@ -3,10 +3,12 @@
 use chrono::Utc;
 use serde::Serialize;
 
-use crate::auth::{AuthContext, token_cache};
+use crate::auth::{AuthContext, session_store, token_cache};
 use crate::cli::Runtime;
+use crate::config::BackendKind;
 use crate::error::Result;
 use crate::graph::GraphClient;
+use crate::rest::RestClient;
 
 #[derive(Serialize)]
 struct Check {
@@ -33,20 +35,23 @@ pub async fn run(rt: &Runtime, offline: bool) -> Result<()> {
             )
         },
     });
-    checks.push(Check {
-        name: "profile",
-        status: if rt.cfg.tenant_id.is_some() && rt.cfg.client_id.is_some() {
-            "pass"
-        } else {
-            "fail"
-        },
-        detail: format!(
-            "{} (tenant: {}, client: {})",
-            rt.cfg.profile_name,
-            present(rt.cfg.tenant_id.is_some()),
-            present(rt.cfg.client_id.is_some())
-        ),
-    });
+    // Tenant and client ID are only needed for Graph's device-code sign-in.
+    if rt.cfg.backend == BackendKind::Graph {
+        checks.push(Check {
+            name: "profile",
+            status: if rt.cfg.tenant_id.is_some() && rt.cfg.client_id.is_some() {
+                "pass"
+            } else {
+                "fail"
+            },
+            detail: format!(
+                "{} (tenant: {}, client: {})",
+                rt.cfg.profile_name,
+                present(rt.cfg.tenant_id.is_some()),
+                present(rt.cfg.client_id.is_some())
+            ),
+        });
+    }
     checks.push(Check {
         name: "write_safety",
         status: "pass",
@@ -56,6 +61,11 @@ pub async fn run(rt: &Runtime, offline: bool) -> Result<()> {
             "remote writes are enabled".into()
         },
     });
+
+    if rt.cfg.backend == BackendKind::Rest {
+        rest_checks(rt, offline, &mut checks).await;
+        return finish(rt, &checks);
+    }
 
     let cache = token_cache::load(&rt.cache_path)?;
     let matching = match (&rt.cfg.tenant_id, &rt.cfg.client_id) {
@@ -122,12 +132,66 @@ pub async fn run(rt: &Runtime, offline: bool) -> Result<()> {
         });
     }
 
+    finish(rt, &checks)
+}
+
+/// Host, stored browser session and a live `currentuser` call for the rest backend.
+async fn rest_checks(rt: &Runtime, offline: bool, checks: &mut Vec<Check>) {
+    let host = rt.cfg.rest.host.clone();
+    checks.push(Check {
+        name: "sharepoint_host",
+        status: if host.is_some() { "pass" } else { "fail" },
+        detail: host
+            .clone()
+            .unwrap_or_else(|| "set `sharepoint_host` in the profile or SHAREPOINT_HOST".into()),
+    });
+    let Some(host) = host else { return };
+
+    let session_result = session_store::get(&rt.session_path, &host);
+    let from_env = rt.cfg.rest.cookie_override.is_some();
+    let has_cookie = matches!(session_result, Ok(Some(_))) || from_env;
+    checks.push(Check {
+        name: "browser_session",
+        status: if has_cookie { "pass" } else { "fail" },
+        detail: if from_env {
+            "from SHAREPOINT_COOKIE".into()
+        } else {
+            match &session_result {
+                Ok(Some(s)) => format!("captured {}", s.captured_at.to_rfc3339()),
+                Ok(None) => "no session; run `sharepoint auth login`".into(),
+                Err(e) => format!("sessions.json is corrupt: {e}"),
+            }
+        },
+    });
+
+    let (status, detail) = if offline {
+        ("skip", "network check skipped".to_string())
+    } else if !has_cookie {
+        ("skip", "skipped until sign-in is complete".to_string())
+    } else {
+        let user = match RestClient::from_config(&rt.cfg, &rt.session_path) {
+            Ok(client) => client.current_user().await,
+            Err(error) => Err(error),
+        };
+        match user {
+            Ok(u) => ("pass", if u.email.is_empty() { u.title } else { u.email }),
+            Err(error) => ("fail", error.to_string()),
+        }
+    };
+    checks.push(Check {
+        name: "sharepoint_rest",
+        status,
+        detail,
+    });
+}
+
+fn finish(rt: &Runtime, checks: &[Check]) -> Result<()> {
     let healthy = checks.iter().all(|check| check.status != "fail");
     if rt.out.json {
         rt.out
             .print_json(&serde_json::json!({"checks": checks, "healthy": healthy}));
     } else {
-        for check in &checks {
+        for check in checks {
             rt.out.print_data(&format!(
                 "{:<20} {:<5} {}",
                 check.name, check.status, check.detail

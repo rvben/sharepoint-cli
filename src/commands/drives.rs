@@ -1,9 +1,8 @@
 //! `sharepoint drives list <site-ref>`
 
-use crate::auth::AuthContext;
+use crate::backend::Backend;
 use crate::cli::{DrivesCmd, Runtime};
 use crate::error::{CliError, Result};
-use crate::graph::{GraphClient, drives, sites};
 use crate::reference::SiteRef;
 
 pub async fn run(rt: &Runtime, cmd: DrivesCmd) -> Result<()> {
@@ -24,8 +23,7 @@ async fn list(
     all: bool,
     fields: &[String],
 ) -> Result<()> {
-    let auth = AuthContext::new(rt.cfg.clone(), rt.cache_path.clone());
-    let graph = GraphClient::new(auth);
+    let backend = Backend::from_runtime(rt)?;
 
     // The site argument can be a URL, an alias name, "default", or spo://Site.
     let site_ref = if site_input == "default" {
@@ -48,14 +46,14 @@ async fn list(
         SiteRef::Name(site_input.to_string())
     };
 
-    let site = sites::resolve(
-        &graph,
-        &site_ref,
-        &rt.cfg.site_aliases,
-        rt.cfg.default_site.as_deref(),
-    )
-    .await?;
-    let mut all_drives = drives::list_drives(&graph, &site.id).await?;
+    let site = backend
+        .resolve_site(
+            &site_ref,
+            &rt.cfg.site_aliases,
+            rt.cfg.default_site.as_deref(),
+        )
+        .await?;
+    let mut all_drives = backend.list_drives(&site).await?;
     let total = all_drives.len();
     if !all && all_drives.len() > limit {
         all_drives.truncate(limit);

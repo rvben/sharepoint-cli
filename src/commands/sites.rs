@@ -1,10 +1,10 @@
 //! `sharepoint sites list | use`
 
-use crate::auth::AuthContext;
+use crate::backend::Backend;
 use crate::cli::{Runtime, SitesCmd};
 use crate::config;
 use crate::error::{CliError, Result};
-use crate::graph::{Cursor, GraphClient, decode_cursor, encode_cursor, sites};
+use crate::graph::{Cursor, decode_cursor, encode_cursor, sites};
 
 pub async fn run(rt: &Runtime, cmd: SitesCmd) -> Result<()> {
     match cmd {
@@ -27,12 +27,11 @@ async fn list(
     page: Option<&str>,
     fields: &[String],
 ) -> Result<()> {
-    let auth = AuthContext::new(rt.cfg.clone(), rt.cache_path.clone());
-    let graph = GraphClient::new(auth);
+    let backend = Backend::from_runtime(rt)?;
 
     // Decode the incoming page token to a (url, skip) cursor.
     let (mut current_url, mut skip) = if let Some(token) = page {
-        let endpoint = graph.graph_endpoint().await;
+        let endpoint = backend.cursor_endpoint().await;
         let cursor = decode_cursor(&endpoint, token)?;
         (cursor.next, cursor.skip)
     } else {
@@ -43,7 +42,7 @@ async fn list(
     let mut source_label: &str;
 
     let out_cursor: Option<Cursor> = 'outer: loop {
-        let res = sites::list(&graph, query, current_url.as_deref()).await?;
+        let res = backend.list_sites(query, current_url.as_deref()).await?;
         source_label = match res.source {
             sites::SiteListSource::Followed => "followed",
             sites::SiteListSource::Search => "search",

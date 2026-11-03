@@ -23,6 +23,11 @@ pub const ENV_REFRESH_TOKEN: &str = "SHAREPOINT_REFRESH_TOKEN";
 pub const ENV_DEBUG_HTTP: &str = "SHAREPOINT_DEBUG_HTTP";
 pub const ENV_GRAPH_ENDPOINT: &str = "MICROSOFT_GRAPH_ENDPOINT";
 pub const ENV_LOGIN_ENDPOINT: &str = "MICROSOFT_LOGIN_ENDPOINT";
+pub const ENV_BACKEND: &str = "SHAREPOINT_BACKEND";
+pub const ENV_SHAREPOINT_HOST: &str = "SHAREPOINT_HOST";
+pub const ENV_REST_ENDPOINT: &str = "SHAREPOINT_REST_ENDPOINT";
+pub const ENV_COOKIE: &str = "SHAREPOINT_COOKIE";
+pub const ENV_BROWSER: &str = "SHAREPOINT_BROWSER";
 
 pub const DEFAULT_PROFILE: &str = "default";
 pub const DEFAULT_GRAPH_ENDPOINT: &str = "https://graph.microsoft.com/v1.0";
@@ -45,6 +50,87 @@ pub struct Profile {
     pub read_only: bool,
     #[serde(default)]
     pub sites: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backend: Option<BackendKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sharepoint_host: Option<String>,
+}
+
+/// Which API family a profile talks to.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BackendKind {
+    /// Microsoft Graph with device-code OAuth (requires an Entra app).
+    #[default]
+    Graph,
+    /// SharePoint REST (`/_api`) with browser-session cookies.
+    Rest,
+}
+
+impl BackendKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BackendKind::Graph => "graph",
+            BackendKind::Rest => "rest",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "graph" => Ok(BackendKind::Graph),
+            "rest" => Ok(BackendKind::Rest),
+            other => Err(CliError::Input(format!(
+                "unknown backend '{other}'; expected 'graph' or 'rest'"
+            ))),
+        }
+    }
+}
+
+/// Settings used only by the SharePoint REST backend.
+#[derive(Default, Clone)]
+pub struct RestConfig {
+    /// Tenant host, e.g. `contoso.sharepoint.com`.
+    pub host: Option<String>,
+    /// Base URL override (tests point this at a mock server).
+    pub endpoint_override: Option<String>,
+    /// Cookie header override; bypasses the session store.
+    pub cookie_override: Option<String>,
+    /// Browser executable for `auth login`.
+    pub browser: Option<String>,
+}
+
+impl std::fmt::Debug for RestConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RestConfig")
+            .field("host", &self.host)
+            .field("endpoint_override", &self.endpoint_override)
+            .field(
+                "cookie_override",
+                &self.cookie_override.as_ref().map(|_| "<redacted>"),
+            )
+            .field("browser", &self.browser)
+            .finish()
+    }
+}
+
+impl RestConfig {
+    /// Base URL all REST calls are sent to, without a trailing slash.
+    pub fn endpoint(&self) -> Result<String> {
+        if let Some(e) = &self.endpoint_override {
+            return Ok(e.trim_end_matches('/').to_string());
+        }
+        let host = self.require_host()?;
+        Ok(format!("https://{host}"))
+    }
+
+    /// The tenant host; required to look up a stored session.
+    pub fn require_host(&self) -> Result<&str> {
+        self.host.as_deref().ok_or_else(|| {
+            CliError::Input(
+                "the rest backend needs a SharePoint host; set `sharepoint_host` in the profile or SHAREPOINT_HOST".into(),
+            )
+        })
+    }
 }
 
 /// Fully resolved runtime settings (after merging file + env + flags).
@@ -61,6 +147,8 @@ pub struct ResolvedConfig {
     pub debug_http: bool,
     pub access_token_override: Option<String>,
     pub refresh_token_seed: Option<String>,
+    pub backend: BackendKind,
+    pub rest: RestConfig,
 }
 
 pub fn config_path() -> Result<PathBuf> {
@@ -73,6 +161,12 @@ pub fn token_cache_path() -> Result<PathBuf> {
     let base =
         dirs::cache_dir().ok_or_else(|| CliError::Other("could not determine cache dir".into()))?;
     Ok(base.join("sharepoint").join("tokens.json"))
+}
+
+pub fn session_store_path() -> Result<PathBuf> {
+    let base =
+        dirs::cache_dir().ok_or_else(|| CliError::Other("could not determine cache dir".into()))?;
+    Ok(base.join("sharepoint").join("sessions.json"))
 }
 
 pub fn load_file(path: &Path) -> Result<ConfigFile> {
@@ -141,6 +235,23 @@ fn parse_bool_env(value: &str) -> bool {
     )
 }
 
+/// Normalize a SharePoint host: trim whitespace, strip a leading scheme
+/// (`https://`/`http://`, case-insensitive) and trailing slash, lower-case
+/// the result, and treat an empty result as `None`.
+pub(crate) fn normalize_host(value: &str) -> Option<String> {
+    let lower = value.trim().to_ascii_lowercase();
+    let without_scheme = lower
+        .strip_prefix("https://")
+        .or_else(|| lower.strip_prefix("http://"))
+        .unwrap_or(lower.as_str());
+    let without_trailing_slash = without_scheme.trim_end_matches('/');
+    if without_trailing_slash.is_empty() {
+        None
+    } else {
+        Some(without_trailing_slash.to_string())
+    }
+}
+
 /// Merge a `ConfigFile` with environment variables and explicit CLI flags.
 ///
 /// Precedence (highest first): explicit flag → env var → profile field → built-in default.
@@ -173,6 +284,20 @@ pub fn resolve(
         .map(|v| parse_bool_env(&v))
         .unwrap_or(false);
 
+    let backend = match env(ENV_BACKEND) {
+        Some(v) => BackendKind::parse(&v)?,
+        None => profile.backend.unwrap_or_default(),
+    };
+    let rest = RestConfig {
+        host: env(ENV_SHAREPOINT_HOST)
+            .as_deref()
+            .and_then(normalize_host)
+            .or_else(|| profile.sharepoint_host.as_deref().and_then(normalize_host)),
+        endpoint_override: env(ENV_REST_ENDPOINT),
+        cookie_override: env(ENV_COOKIE),
+        browser: env(ENV_BROWSER),
+    };
+
     Ok(ResolvedConfig {
         profile_name,
         tenant_id,
@@ -185,6 +310,8 @@ pub fn resolve(
         debug_http,
         access_token_override: env(ENV_ACCESS_TOKEN),
         refresh_token_seed: env(ENV_REFRESH_TOKEN),
+        backend,
+        rest,
     })
 }
 
@@ -199,6 +326,8 @@ pub fn profile_summaries(file: &ConfigFile) -> Vec<serde_json::Value> {
                 "client_id": profile.client_id,
                 "default_site": profile.default_site,
                 "read_only": profile.read_only,
+                "backend": profile.backend.map(BackendKind::as_str),
+                "sharepoint_host": profile.sharepoint_host,
             })
         })
         .collect()
@@ -419,5 +548,134 @@ mod tests {
             .filter(|e| e.file_name() != "config.toml")
             .collect();
         assert!(leftovers.is_empty(), "temp file left behind: {leftovers:?}");
+    }
+
+    fn env_from(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let map: std::collections::HashMap<String, String> = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        move |k: &str| map.get(k).cloned()
+    }
+
+    #[test]
+    fn backend_defaults_to_graph() {
+        let cfg = resolve(&ConfigFile::default(), None, &env_from(&[])).unwrap();
+        assert_eq!(cfg.backend, BackendKind::Graph);
+        assert!(cfg.rest.host.is_none());
+    }
+
+    #[test]
+    fn backend_rest_from_profile() {
+        let mut file = ConfigFile::default();
+        file.profile.insert(
+            "default".into(),
+            Profile {
+                backend: Some(BackendKind::Rest),
+                sharepoint_host: Some("contoso.sharepoint.com".into()),
+                ..Profile::default()
+            },
+        );
+        let cfg = resolve(&file, None, &env_from(&[])).unwrap();
+        assert_eq!(cfg.backend, BackendKind::Rest);
+        assert_eq!(
+            cfg.rest.endpoint().unwrap(),
+            "https://contoso.sharepoint.com"
+        );
+    }
+
+    #[test]
+    fn rest_env_overrides_win() {
+        let cfg = resolve(
+            &ConfigFile::default(),
+            None,
+            &env_from(&[
+                (ENV_BACKEND, "rest"),
+                (ENV_SHAREPOINT_HOST, "contoso.sharepoint.com"),
+                (ENV_REST_ENDPOINT, "http://127.0.0.1:9999/"),
+                (ENV_COOKIE, "FedAuth=F; rtFa=R"),
+            ]),
+        )
+        .unwrap();
+        assert_eq!(cfg.backend, BackendKind::Rest);
+        assert_eq!(cfg.rest.endpoint().unwrap(), "http://127.0.0.1:9999");
+        assert_eq!(
+            cfg.rest.cookie_override.as_deref(),
+            Some("FedAuth=F; rtFa=R")
+        );
+    }
+
+    #[test]
+    fn invalid_backend_env_is_input_error() {
+        let err = resolve(
+            &ConfigFile::default(),
+            None,
+            &env_from(&[(ENV_BACKEND, "soap")]),
+        )
+        .unwrap_err();
+        assert!(matches!(err, CliError::Input(_)));
+    }
+
+    #[test]
+    fn rest_endpoint_requires_host() {
+        let err = RestConfig::default().endpoint().unwrap_err();
+        assert!(matches!(err, CliError::Input(_)));
+    }
+
+    #[test]
+    fn normalize_host_strips_scheme_slash_and_lowercases() {
+        assert_eq!(
+            normalize_host("https://Contoso.sharepoint.com/"),
+            Some("contoso.sharepoint.com".to_string())
+        );
+        assert_eq!(normalize_host("  "), None);
+    }
+
+    #[test]
+    fn rest_backend_toml_round_trips_through_resolve_and_summaries() {
+        let toml = r#"
+            [profile.default]
+            backend = "rest"
+            sharepoint_host = "contoso.sharepoint.com"
+        "#;
+        let file: ConfigFile = toml::from_str(toml).unwrap();
+        let cfg = resolve(&file, None, &env_from(&[])).unwrap();
+        assert_eq!(cfg.backend, BackendKind::Rest);
+        assert_eq!(cfg.rest.host.as_deref(), Some("contoso.sharepoint.com"));
+
+        let summaries = profile_summaries(&file);
+        assert_eq!(summaries[0]["backend"], "rest");
+    }
+
+    #[test]
+    fn rest_config_debug_redacts_cookie() {
+        let cfg = RestConfig {
+            host: Some("contoso.sharepoint.com".into()),
+            cookie_override: Some("FedAuth=super-secret; rtFa=also-secret".into()),
+            ..Default::default()
+        };
+        let debug = format!("{cfg:?}");
+        assert!(!debug.contains("super-secret"));
+        assert!(!debug.contains("also-secret"));
+        assert!(debug.contains("<redacted>"));
+    }
+
+    #[test]
+    fn sharepoint_host_env_overrides_profile() {
+        let mut file = ConfigFile::default();
+        file.profile.insert(
+            "default".into(),
+            Profile {
+                sharepoint_host: Some("from-profile.sharepoint.com".into()),
+                ..Profile::default()
+            },
+        );
+        let cfg = resolve(
+            &file,
+            None,
+            &env_from(&[(ENV_SHAREPOINT_HOST, "from-env.sharepoint.com")]),
+        )
+        .unwrap();
+        assert_eq!(cfg.rest.host.as_deref(), Some("from-env.sharepoint.com"));
     }
 }

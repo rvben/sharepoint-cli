@@ -13,7 +13,7 @@ use crate::output::{OutputConfig, OutputFormat};
 #[command(
     name = "sharepoint",
     about = "Agent-friendly SharePoint Online CLI",
-    after_help = "Get started:\n  sharepoint init                     Configure and sign in\n  sharepoint doctor                   Check configuration and Graph access\n  sharepoint sites list               Discover your sites\n  sharepoint schema --command 'files ls'\n                                      Inspect one command for automation",
+    after_help = "Get started:\n  sharepoint init                     Configure and sign in\n  sharepoint doctor                   Check configuration and access\n  sharepoint sites list               Discover your sites\n  sharepoint schema --command 'files ls'\n                                      Inspect one command for automation",
     version,
     propagate_version = true,
     disable_help_subcommand = true
@@ -63,7 +63,7 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Configure a profile and optionally start device-code login.
+    /// Configure a profile and optionally sign in (device code for graph, browser for rest).
     Init(InitArgs),
     /// Sub-commands: login, logout, status.
     #[command(subcommand)]
@@ -83,9 +83,9 @@ pub enum Command {
     /// Sub-commands: ls, stat, download, find.
     #[command(subcommand)]
     Files(FilesCmd),
-    /// Check configuration, credential cache, and Graph access.
+    /// Check configuration, credentials, and Microsoft Graph or SharePoint REST access.
     Doctor {
-        /// Skip the Microsoft Graph connectivity check.
+        /// Skip the network connectivity check.
         #[arg(long)]
         offline: bool,
     },
@@ -101,22 +101,22 @@ pub enum Command {
 
 #[derive(Debug, Subcommand)]
 pub enum AuthCmd {
-    /// Run the device-code flow and cache the resulting tokens.
+    /// Sign in: device-code flow (graph backend) or interactive browser (rest backend).
     Login,
-    /// Delete cached tokens for the active profile's tenant/client.
+    /// Sign out: delete cached tokens (graph backend) or the stored browser session (rest backend).
     Logout,
-    /// Show cached account info, expiry, scopes.
+    /// Show cached credentials (graph: accounts, expiry, scopes; rest: browser session) and verify them.
     Status {
-        /// Inspect cached credentials without contacting Microsoft Graph.
+        /// Inspect cached credentials without contacting SharePoint or Microsoft Graph.
         #[arg(long)]
         offline: bool,
-        /// Maximum number of accounts to show.
+        /// Maximum number of accounts to show (graph backend only).
         #[arg(long, default_value_t = 50)]
         limit: usize,
         /// Opaque pagination cursor from a previous response's `next` field.
         #[arg(long)]
         page: Option<String>,
-        /// Comma-separated fields to include (e.g. username,expires_at).
+        /// Comma-separated item fields to include (e.g. username,expires_at; rest backend: host,username,captured_at).
         #[arg(long, value_delimiter = ',')]
         fields: Vec<String>,
     },
@@ -128,7 +128,7 @@ pub enum ProfileCmd {
     List,
     /// Select the default profile for future commands.
     Use { name: String },
-    /// Remove a profile and its cached credentials.
+    /// Remove a profile and its cached Graph tokens.
     Remove { name: String },
 }
 
@@ -138,7 +138,7 @@ pub struct InitArgs {
     #[arg(long, env = config::ENV_DEFAULT_SITE)]
     pub default_site: Option<String>,
 
-    /// Save the profile without starting device-code login.
+    /// Save the profile without signing in.
     #[arg(long)]
     pub no_login: bool,
 
@@ -157,7 +157,7 @@ pub enum ConfigCmd {
 
 #[derive(Debug, Subcommand)]
 pub enum SitesCmd {
-    /// List sites. Without --query: followed sites; with --query: search.
+    /// List sites. Without --query: followed sites (graph) or all sites via search (rest); with --query: search.
     List {
         #[arg(long)]
         query: Option<String>,
@@ -252,6 +252,7 @@ pub struct Runtime {
     pub config_file: ConfigFile,
     pub config_path: std::path::PathBuf,
     pub cache_path: std::path::PathBuf,
+    pub session_path: std::path::PathBuf,
 }
 
 impl Runtime {
@@ -268,6 +269,7 @@ impl Runtime {
             cfg.client_id = Some(c.clone());
         }
         let cache_path = config::token_cache_path()?;
+        let session_path = config::session_store_path()?;
         Ok(Self {
             out: OutputConfig::new(
                 if cli.json && cli.output == OutputFormat::Auto {
@@ -281,6 +283,7 @@ impl Runtime {
             config_file,
             config_path,
             cache_path,
+            session_path,
         })
     }
 }

@@ -13,6 +13,9 @@ pub(crate) struct Drive {
     pub(crate) name: String,
     #[serde(rename = "driveType", default)]
     pub(crate) drive_type: String,
+    /// Server-relative URL of the library root (REST backend only; Graph leaves it `None`).
+    #[serde(skip)]
+    pub(crate) root_folder: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -300,6 +303,7 @@ mod tests {
             id: "D1".into(),
             name: "Documents".into(),
             drive_type: "documentLibrary".into(),
+            root_folder: None,
         }
     }
 

@@ -14,9 +14,9 @@ pub enum CliError {
     Conflict(String),
     /// Site, library, or item not found (exit 4).
     NotFound(String),
-    /// Graph API returned a non-2xx error (exit 5).
+    /// The remote API (Graph or SharePoint REST) returned a non-2xx error (exit 5).
     Api { status: u16, message: String },
-    /// Rate limited by Graph (exit 6).
+    /// Rate limited by Microsoft 365 (exit 6).
     RateLimit,
     /// Underlying HTTP transport error (exit 1).
     Http(String),
@@ -32,8 +32,8 @@ impl fmt::Display for CliError {
             CliError::ReadOnly(m) => write!(f, "{m}"),
             CliError::Conflict(m) => write!(f, "{m}"),
             CliError::NotFound(m) => write!(f, "{m}"),
-            CliError::Api { status, message } => write!(f, "Graph API {status}: {message}"),
-            CliError::RateLimit => write!(f, "rate limited by Microsoft Graph"),
+            CliError::Api { status, message } => write!(f, "API {status}: {message}"),
+            CliError::RateLimit => write!(f, "rate limited by Microsoft 365"),
             CliError::Http(m) => write!(f, "{m}"),
             CliError::Other(m) => write!(f, "{m}"),
         }
@@ -160,7 +160,15 @@ mod tests {
             status: 404,
             message: "not found".into(),
         };
-        assert_eq!(format!("{e}"), "Graph API 404: not found");
+        assert_eq!(format!("{e}"), "API 404: not found");
+    }
+
+    #[test]
+    fn display_rate_limit_is_backend_neutral() {
+        assert_eq!(
+            format!("{}", CliError::RateLimit),
+            "rate limited by Microsoft 365"
+        );
     }
 
     #[test]

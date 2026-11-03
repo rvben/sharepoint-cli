@@ -22,7 +22,12 @@ async fn show(rt: &Runtime) -> Result<()> {
         "login_endpoint": rt.cfg.login_endpoint,
         "config_path": rt.config_path.display().to_string(),
         "cache_path": rt.cache_path.display().to_string(),
-        // Tokens deliberately omitted — they are bearer secrets.
+        "backend": rt.cfg.backend.as_str(),
+        "sharepoint_host": rt.cfg.rest.host,
+        "rest_endpoint": rt.cfg.rest.endpoint().ok(),
+        "session_path": rt.session_path.display().to_string(),
+        // Tokens and the SHAREPOINT_COOKIE override deliberately omitted —
+        // they are bearer secrets.
     });
     if rt.out.json {
         rt.out.print_json(&value);
@@ -34,14 +39,17 @@ async fn show(rt: &Runtime) -> Result<()> {
                 .unwrap_or("-")
         };
         rt.out.print_data(&format!(
-            "Profile: {}\nTenant: {}\nClient ID: {}\nDefault site: {}\nRead only: {}\nConfig: {}\nToken cache: {}",
+            "Profile: {}\nBackend: {}\nTenant: {}\nClient ID: {}\nSharePoint host: {}\nDefault site: {}\nRead only: {}\nConfig: {}\nToken cache: {}\nBrowser sessions: {}",
             masked("profile"),
+            masked("backend"),
             masked("tenant_id"),
             masked("client_id"),
+            masked("sharepoint_host"),
             masked("default_site"),
             value["read_only"],
             masked("config_path"),
-            masked("cache_path")
+            masked("cache_path"),
+            masked("session_path")
         ));
     }
     Ok(())

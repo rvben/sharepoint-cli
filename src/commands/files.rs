@@ -3,16 +3,16 @@
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt as _;
 
-use crate::auth::AuthContext;
+use crate::backend::Backend;
 use crate::cli::{FilesCmd, Runtime};
 use crate::error::{CliError, Result};
 use crate::graph::drives::{Drive, canonical_json};
 use crate::graph::sites::Site;
-use crate::graph::{Cursor, GraphClient, decode_cursor, drives, encode_cursor, search};
+use crate::graph::{Cursor, decode_cursor, encode_cursor};
 use crate::output::terminal_width;
 use crate::reference::{ParsedRef, parse};
 
-/// Resolved reference: everything the sub-commands need to call Graph.
+/// Resolved reference: everything the sub-commands need to call the backend.
 struct Resolved {
     site: Site,
     drive: Drive,
@@ -28,20 +28,19 @@ struct PageOpts<'a> {
 }
 
 /// Parse `reference`, build auth+client, resolve site and drive.
-async fn resolve(rt: &Runtime, reference: &str) -> Result<(GraphClient, Resolved)> {
+async fn resolve(rt: &Runtime, reference: &str) -> Result<(Backend, Resolved)> {
     let default_site_set = rt.cfg.default_site.is_some();
     let parsed = parse(reference, default_site_set)?;
 
-    let auth = AuthContext::new(rt.cfg.clone(), rt.cache_path.clone());
-    let graph = GraphClient::new(auth);
+    let backend = Backend::from_runtime(rt)?;
 
-    let site = crate::graph::sites::resolve(
-        &graph,
-        &parsed.site,
-        &rt.cfg.site_aliases,
-        rt.cfg.default_site.as_deref(),
-    )
-    .await?;
+    let site = backend
+        .resolve_site(
+            &parsed.site,
+            &rt.cfg.site_aliases,
+            rt.cfg.default_site.as_deref(),
+        )
+        .await?;
 
     let library = parsed.library.as_deref().ok_or_else(|| {
         CliError::Input(format!(
@@ -49,10 +48,10 @@ async fn resolve(rt: &Runtime, reference: &str) -> Result<(GraphClient, Resolved
         ))
     })?;
 
-    let drive = drives::find_drive_by_name(&graph, &site.id, library).await?;
+    let drive = backend.find_drive(&site, library).await?;
 
     Ok((
-        graph,
+        backend,
         Resolved {
             site,
             drive,
@@ -134,10 +133,12 @@ async fn ls(
         ));
     }
 
-    let (graph, r) = resolve(rt, reference).await?;
+    let (backend, r) = resolve(rt, reference).await?;
 
     if recursive {
-        let items = drives::list_children_recursive(&graph, &r.drive.id, &r.parsed.path).await?;
+        let items = backend
+            .list_children_recursive(&r.site, &r.drive, &r.parsed.path)
+            .await?;
 
         if rt.out.json {
             let json_items: Vec<_> = items
@@ -180,7 +181,7 @@ async fn ls(
     // Paginated single-level listing.
     let effective_limit = limit.unwrap_or(DEFAULT_LIMIT);
     let (mut current_url, mut skip) = if let Some(token) = page {
-        let endpoint = graph.graph_endpoint().await;
+        let endpoint = backend.cursor_endpoint().await;
         let cursor = decode_cursor(&endpoint, token)?;
         (cursor.next, cursor.skip)
     } else {
@@ -190,9 +191,9 @@ async fn ls(
     let mut items: Vec<_> = Vec::new();
 
     let out_cursor: Option<Cursor> = 'outer: loop {
-        let pageres =
-            drives::list_children(&graph, &r.drive.id, &r.parsed.path, current_url.as_deref())
-                .await?;
+        let pageres = backend
+            .list_children(&r.site, &r.drive, &r.parsed.path, current_url.as_deref())
+            .await?;
 
         for (idx, it) in pageres.items.iter().enumerate() {
             if idx < skip {
@@ -263,8 +264,8 @@ async fn ls(
 }
 
 async fn stat(rt: &Runtime, reference: &str) -> Result<()> {
-    let (graph, r) = resolve(rt, reference).await?;
-    let item = drives::get_item_with_download_url(&graph, &r.drive.id, &r.parsed.path).await?;
+    let (backend, r) = resolve(rt, reference).await?;
+    let item = backend.get_item(&r.site, &r.drive, &r.parsed.path).await?;
     let v = canonical_json(&item, &r.site, &r.drive, true);
     // stat is data-heavy: emit canonical JSON in both modes (human readers
     // benefit from the structured form when inspecting metadata).
@@ -278,7 +279,7 @@ async fn download(
     output: Option<&str>,
     overwrite: bool,
 ) -> Result<()> {
-    let (graph, r) = resolve(rt, reference).await?;
+    let (backend, r) = resolve(rt, reference).await?;
 
     // Derive the target filename from the path when --output is not given.
     let derived;
@@ -298,13 +299,9 @@ async fn download(
 
     if target == "-" {
         let mut stdout = tokio::io::stdout();
-        let bytes = crate::graph::download::download_to_writer(
-            &graph,
-            &r.drive.id,
-            &r.parsed.path,
-            &mut stdout,
-        )
-        .await?;
+        let bytes = backend
+            .download_to_writer(&r.site, &r.drive, &r.parsed.path, &mut stdout)
+            .await?;
         stdout.flush().await.ok();
         rt.out
             .print_message(&format!("{bytes} bytes written to stdout"));
@@ -330,9 +327,9 @@ async fn download(
         .await
         .map_err(|e| CliError::Other(format!("create '{target}': {e}")))?;
 
-    let n =
-        crate::graph::download::download_to_writer(&graph, &r.drive.id, &r.parsed.path, &mut file)
-            .await?;
+    let n = backend
+        .download_to_writer(&r.site, &r.drive, &r.parsed.path, &mut file)
+        .await?;
     rt.out
         .print_message(&format!("Downloaded {n} byte(s) to {}", path.display()));
     if rt.out.json {
@@ -357,13 +354,13 @@ async fn find(
         page,
         fields,
     } = opts;
-    let (graph, r) = resolve(rt, reference).await?;
+    let (backend, r) = resolve(rt, reference).await?;
     // Permissive default query when only --name is given (Graph requires a query).
     let q = query.unwrap_or("*");
 
     // Decode the incoming page token to a (url, skip) cursor.
     let (mut current_url, mut skip) = if let Some(token) = page {
-        let endpoint = graph.graph_endpoint().await;
+        let endpoint = backend.cursor_endpoint().await;
         let cursor = decode_cursor(&endpoint, token)?;
         (cursor.next, cursor.skip)
     } else {
@@ -373,7 +370,7 @@ async fn find(
     let mut items = Vec::new();
 
     let out_cursor: Option<Cursor> = 'outer: loop {
-        let res = search::search(&graph, &r.drive.id, q, current_url.as_deref()).await?;
+        let res = backend.search(&r.drive, q, current_url.as_deref()).await?;
 
         for (idx, it) in res.items.iter().enumerate() {
             if idx < skip {
@@ -381,7 +378,7 @@ async fn find(
             }
             // Apply optional glob filter without counting filtered items toward skip.
             if let Some(g) = name_glob
-                && !search::glob_matches(g, &it.name)
+                && !crate::graph::search::glob_matches(g, &it.name)
             {
                 continue;
             }

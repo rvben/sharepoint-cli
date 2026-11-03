@@ -86,7 +86,7 @@ sharepoint init
 # Or sign in to an already-configured profile
 sharepoint auth login
 
-# List followed sites
+# List sites: followed sites (graph backend) or all sites via search (rest backend)
 sharepoint sites list
 
 # List libraries in a site
@@ -149,7 +149,49 @@ Environment overrides:
 
 - `SHAREPOINT_PROFILE` — active profile name
 - `SHAREPOINT_TENANT_ID` — tenant override
-- `SHAREPOINT_CLIENT_ID` — Entra application (client) ID — **required**
+- `SHAREPOINT_CLIENT_ID` — Entra application (client) ID — **required** for the `graph` backend
+- `SHAREPOINT_BACKEND` — `graph` (default) or `rest`
+- `SHAREPOINT_HOST` — SharePoint host for the `rest` backend, e.g. `contoso.sharepoint.com`
+- `SHAREPOINT_COOKIE` — session cookie header for the `rest` backend; skips the stored browser session
+- `SHAREPOINT_BROWSER` — browser executable that `auth login` launches for the `rest` backend
+
+## Without Microsoft Graph (browser session)
+
+If you can't register an Entra app or get Graph consent, use the `rest`
+backend. It signs in through a real browser and calls the SharePoint REST API
+(`/_api`) with your session cookies. No tenant or client ID is needed.
+
+```toml
+# ~/.config/sharepoint/config.toml
+[profile.work]
+backend = "rest"
+sharepoint_host = "contoso.sharepoint.com"
+```
+
+```sh
+sharepoint --profile work auth login     # opens Edge/Chrome/Chromium; finish SSO
+sharepoint --profile work auth status
+sharepoint --profile work sites list
+sharepoint --profile work files ls https://contoso.sharepoint.com/sites/Marketing/Documents/
+sharepoint --profile work doctor
+```
+
+- `auth login` needs a Chromium-based browser (Edge, Chrome, Chromium or Brave).
+  It launches it with a throwaway profile, waits up to five minutes for you to
+  finish signing in, then closes it. Set `SHAREPOINT_BROWSER` to pick one
+  explicitly.
+- A snap-packaged Chromium (the default `chromium` on Ubuntu) won't work: its
+  private `/tmp` hides the browser's DevTools port file from the CLI. Point
+  `SHAREPOINT_BROWSER` at a non-snap Chrome, Chromium or Edge instead.
+- The session is stored per host in `$XDG_CACHE_HOME/sharepoint/sessions.json`
+  (or `~/.cache/sharepoint/sessions.json`) with mode 0600. When it expires, run
+  `sharepoint auth login` again; `sharepoint auth logout` removes it.
+- `sites list` without a query returns all sites visible to you via search
+  (the `graph` backend returns followed sites).
+- `files stat` has no `download_url` on this backend.
+- Tenants that require a compliant or managed device may block sign-in from a
+  fresh browser profile.
+- For CI, pass `SHAREPOINT_COOKIE="FedAuth=…; rtFa=…"` instead of signing in.
 
 ## License
 

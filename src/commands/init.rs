@@ -1,14 +1,15 @@
 //! `sharepoint init` — guided or headless first-run setup.
 //!
-//! Resolves the tenant, client ID, and optional default site; writes the
-//! config file; then runs the same device-code login as `sharepoint auth
-//! login`. Headless callers can provide explicit values and defer login.
+//! Resolves whatever the active backend needs — tenant and client ID for
+//! graph, or a SharePoint host for rest — writes the config file, then runs
+//! the same sign-in as `sharepoint auth login`. Headless callers can provide
+//! explicit values and defer login.
 
 use std::io::{BufRead, IsTerminal, Write};
 
 use crate::cli::{AuthCmd, InitArgs, Runtime};
 use crate::commands::auth;
-use crate::config;
+use crate::config::{self, BackendKind};
 use crate::error::{CliError, Result};
 
 pub async fn run(rt: &Runtime, args: InitArgs) -> Result<()> {
@@ -24,20 +25,50 @@ pub async fn run(rt: &Runtime, args: InitArgs) -> Result<()> {
     let stdin = std::io::stdin();
     let mut lines = stdin.lock().lines();
 
-    let tenant = resolve_required(
-        &mut lines,
-        interactive,
-        "Tenant (domain or GUID)",
-        rt.cfg.tenant_id.as_deref(),
-        "--tenant <domain-or-guid> or SHAREPOINT_TENANT_ID",
-    )?;
-    let client_id = resolve_required(
-        &mut lines,
-        interactive,
-        "Client ID (Entra public-client app GUID)",
-        rt.cfg.client_id.as_deref(),
-        "--client-id <application-id> or SHAREPOINT_CLIENT_ID",
-    )?;
+    let profile_name = rt.cfg.profile_name.clone();
+    let mut file = rt.config_file.clone();
+    file.active_profile = Some(profile_name.clone());
+    let mut updated = rt.cfg.clone();
+    let entry = file.profile.entry(profile_name.clone()).or_default();
+
+    match rt.cfg.backend {
+        BackendKind::Rest => {
+            let raw_host = resolve_required(
+                &mut lines,
+                interactive,
+                "SharePoint host (e.g. contoso.sharepoint.com)",
+                rt.cfg.rest.host.as_deref(),
+                "SHAREPOINT_HOST or sharepoint_host in the profile",
+            )?;
+            let host = config::normalize_host(&raw_host)
+                .ok_or_else(|| CliError::Input("SharePoint host is required".into()))?;
+            entry.backend = Some(BackendKind::Rest);
+            entry.sharepoint_host = Some(host.clone());
+            updated.backend = BackendKind::Rest;
+            updated.rest.host = Some(host);
+        }
+        BackendKind::Graph => {
+            let tenant = resolve_required(
+                &mut lines,
+                interactive,
+                "Tenant (domain or GUID)",
+                rt.cfg.tenant_id.as_deref(),
+                "--tenant <domain-or-guid> or SHAREPOINT_TENANT_ID",
+            )?;
+            let client_id = resolve_required(
+                &mut lines,
+                interactive,
+                "Client ID (Entra public-client app GUID)",
+                rt.cfg.client_id.as_deref(),
+                "--client-id <application-id> or SHAREPOINT_CLIENT_ID",
+            )?;
+            entry.tenant_id = Some(tenant.clone());
+            entry.client_id = Some(client_id.clone());
+            updated.tenant_id = Some(tenant);
+            updated.client_id = Some(client_id);
+        }
+    }
+
     let configured_site = args.default_site.or_else(|| rt.cfg.default_site.clone());
     let default_site = if interactive {
         prompt_value(
@@ -49,13 +80,6 @@ pub async fn run(rt: &Runtime, args: InitArgs) -> Result<()> {
     } else {
         configured_site
     };
-
-    let profile_name = rt.cfg.profile_name.clone();
-    let mut file = rt.config_file.clone();
-    file.active_profile = Some(profile_name.clone());
-    let entry = file.profile.entry(profile_name.clone()).or_default();
-    entry.tenant_id = Some(tenant.clone());
-    entry.client_id = Some(client_id.clone());
     entry.default_site = default_site.clone();
     entry.read_only = args.read_only || rt.cfg.read_only;
     config::save_file(&rt.config_path, &file)?;
@@ -63,9 +87,6 @@ pub async fn run(rt: &Runtime, args: InitArgs) -> Result<()> {
         .print_message(&format!("Wrote {}", rt.config_path.display()));
 
     // Re-build runtime so the new config is loaded for the auth-login call.
-    let mut updated = rt.cfg.clone();
-    updated.tenant_id = Some(tenant);
-    updated.client_id = Some(client_id);
     updated.default_site = default_site;
     updated.read_only = args.read_only || rt.cfg.read_only;
     let read_only = updated.read_only;
@@ -75,6 +96,7 @@ pub async fn run(rt: &Runtime, args: InitArgs) -> Result<()> {
         config_file: file,
         config_path: rt.config_path.clone(),
         cache_path: rt.cache_path.clone(),
+        session_path: rt.session_path.clone(),
     };
 
     if args.no_login {

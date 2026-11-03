@@ -47,6 +47,8 @@ async fn graph_retries_on_429_then_succeeds() {
         debug_http: false,
         access_token_override: Some("FAKE".into()),
         refresh_token_seed: None,
+        backend: sharepoint_cli::config::BackendKind::Graph,
+        rest: sharepoint_cli::config::RestConfig::default(),
     };
     let auth = AuthContext::new(cfg, dir.path().join("tokens.json"));
     let graph = GraphClient::new(auth);

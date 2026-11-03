@@ -34,6 +34,7 @@ fn config_show_has_exact_key_set() {
         let mut actual: Vec<&str> = obj.keys().map(String::as_str).collect();
         actual.sort_unstable();
         let mut expected = vec![
+            "backend",
             "cache_path",
             "client_id",
             "config_path",
@@ -42,6 +43,9 @@ fn config_show_has_exact_key_set() {
             "login_endpoint",
             "profile",
             "read_only",
+            "rest_endpoint",
+            "session_path",
+            "sharepoint_host",
             "site_aliases",
             "tenant_id",
         ];

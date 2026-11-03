@@ -62,3 +62,42 @@ fn init_can_configure_quietly_without_login() {
     assert!(config.contains("default_site = \"Marketing\""));
     assert!(config.contains("read_only = true"));
 }
+
+#[test]
+fn init_can_configure_rest_backend_quietly_without_login() {
+    let (dir, mut command) = isolated();
+    let out = command
+        .env("SHAREPOINT_BACKEND", "rest")
+        .env("SHAREPOINT_HOST", "https://Contoso.SharePoint.com/")
+        .args([
+            "--quiet",
+            "init",
+            "--default-site",
+            "Marketing",
+            "--no-login",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(result["signed_in"], false);
+
+    let config_path = result["config_path"].as_str().unwrap();
+    assert!(
+        std::path::Path::new(config_path).starts_with(dir.path()),
+        "config escaped isolated home: {config_path}"
+    );
+    let config = std::fs::read_to_string(config_path).unwrap();
+    assert!(config.contains("backend = \"rest\""));
+    // The host written to the profile is normalized: scheme and trailing
+    // slash stripped, lower-cased.
+    assert!(
+        config.contains("sharepoint_host = \"contoso.sharepoint.com\""),
+        "{config}"
+    );
+    assert!(!config.contains("Contoso.SharePoint.com"));
+}

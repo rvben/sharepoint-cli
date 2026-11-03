@@ -2,22 +2,36 @@
 
 use chrono::{Duration, Utc};
 
-use crate::auth::{AuthContext, device_code, require_client_id, token_cache};
+use crate::auth::{
+    AuthContext, browser, device_code, require_client_id, session_store, token_cache,
+};
 use crate::cli::{AuthCmd, Runtime};
-use crate::config;
+use crate::config::{self, BackendKind};
 use crate::error::{CliError, Result};
 use crate::graph::GraphClient;
+use crate::rest::RestClient;
 
 pub async fn run(rt: &Runtime, cmd: AuthCmd) -> Result<()> {
-    match cmd {
-        AuthCmd::Login => login(rt).await,
-        AuthCmd::Logout => logout(rt).await,
-        AuthCmd::Status {
-            offline,
-            limit,
-            page,
-            fields,
-        } => status(rt, offline, limit, page.as_deref(), &fields).await,
+    match (rt.cfg.backend, cmd) {
+        (BackendKind::Rest, AuthCmd::Login) => rest_login(rt).await,
+        (BackendKind::Rest, AuthCmd::Logout) => rest_logout(rt),
+        (
+            BackendKind::Rest,
+            AuthCmd::Status {
+                offline, fields, ..
+            },
+        ) => rest_status(rt, offline, &fields).await,
+        (BackendKind::Graph, AuthCmd::Login) => login(rt).await,
+        (BackendKind::Graph, AuthCmd::Logout) => logout(rt).await,
+        (
+            BackendKind::Graph,
+            AuthCmd::Status {
+                offline,
+                limit,
+                page,
+                fields,
+            },
+        ) => status(rt, offline, limit, page.as_deref(), &fields).await,
     }
 }
 
@@ -186,6 +200,154 @@ async fn status(
         if total == 0 {
             rt.out
                 .print_message("No cached accounts. Run `sharepoint auth login`.");
+        }
+    }
+    Ok(())
+}
+
+async fn rest_login(rt: &Runtime) -> Result<()> {
+    let host = rt.cfg.rest.require_host()?.to_string();
+    let endpoint = rt.cfg.rest.endpoint()?;
+    let browser_path = browser::find_browser(rt.cfg.rest.browser.as_deref())?;
+    rt.out.print_required_prompt(&format!(
+        "Opening {} — sign in to https://{host}/ in the new window (timeout {}s).",
+        browser_path.display(),
+        browser::LOGIN_TIMEOUT.as_secs()
+    ));
+
+    // Each candidate cookie pair is probed against `currentuser`; an Auth
+    // error just means SSO has not finished yet, so keep polling (its message
+    // is reported if the login eventually times out).
+    let cookie = browser::capture_session(
+        &browser_path,
+        &format!("https://{host}/"),
+        &host,
+        |candidate| {
+            let endpoint = endpoint.clone();
+            let host = host.clone();
+            async move {
+                let client = RestClient::with_host(&endpoint, &host, &candidate)?;
+                match client.current_user().await {
+                    Ok(_) => Ok(browser::Probe::Accepted),
+                    Err(CliError::Auth(reason)) => Ok(browser::Probe::Rejected(reason)),
+                    Err(e) => Err(e),
+                }
+            }
+        },
+    )
+    .await?;
+
+    // Re-read identity with the accepted cookie (the probe closure can't move it out).
+    let client = RestClient::with_host(&endpoint, &host, &cookie)?;
+    let username = client
+        .current_user()
+        .await
+        .ok()
+        .map(|u| if u.email.is_empty() { u.title } else { u.email });
+
+    session_store::upsert(
+        &rt.session_path,
+        &host,
+        session_store::Session {
+            cookie,
+            captured_at: Utc::now(),
+            username: username.clone(),
+        },
+    )?;
+
+    let who = username.as_deref().unwrap_or("unknown user");
+    rt.out
+        .print_message(&format!("Signed in to {host} as {who}"));
+    if rt.out.json {
+        rt.out.print_json(&serde_json::json!({
+            "backend": "rest",
+            "host": host,
+            "username": username,
+        }));
+    }
+    Ok(())
+}
+
+fn rest_logout(rt: &Runtime) -> Result<()> {
+    let host = rt.cfg.rest.require_host()?;
+    let removed = usize::from(session_store::remove(&rt.session_path, host)?);
+    rt.out
+        .print_message(&format!("Removed {removed} browser session(s) for {host}"));
+    if rt.out.json {
+        rt.out.print_json(&serde_json::json!({
+            "backend": "rest",
+            "host": host,
+            "removed": removed,
+        }));
+    }
+    Ok(())
+}
+
+async fn rest_status(rt: &Runtime, offline: bool, fields: &[String]) -> Result<()> {
+    let host = rt.cfg.rest.require_host()?.to_string();
+    let session = session_store::get(&rt.session_path, &host)?;
+    let mut items = Vec::new();
+    if let Some(s) = &session {
+        let mut obj = serde_json::json!({
+            "host": host,
+            "username": s.username,
+            "captured_at": s.captured_at.to_rfc3339(),
+        });
+        if !fields.is_empty()
+            && let serde_json::Value::Object(ref mut map) = obj
+        {
+            map.retain(|k, _| fields.iter().any(|f| f == k));
+        }
+        items.push(obj);
+    }
+    let from_env = rt.cfg.rest.cookie_override.is_some();
+    let user = if offline || (session.is_none() && !from_env) {
+        None
+    } else {
+        Some(
+            RestClient::from_config(&rt.cfg, &rt.session_path)?
+                .current_user()
+                .await?,
+        )
+    };
+    let identity = user.as_ref().map(|u| {
+        serde_json::json!({
+            "name": u.title,
+            "email": u.email,
+            "login_name": u.login_name,
+        })
+    });
+
+    if rt.out.json {
+        rt.out.print_json(&serde_json::json!({
+            "backend": "rest",
+            "total": items.len(),
+            "next": serde_json::Value::Null,
+            "items": items,
+            "verified": identity.is_some(),
+            "identity": identity,
+        }));
+    } else {
+        // Always emit at least the column header so stdout is non-empty in text mode.
+        rt.out.print_data(&format!("{:30}  {}", "HOST", "CAPTURED"));
+        if let Some(s) = &session {
+            rt.out
+                .print_data(&format!("{:30}  {}", host, s.captured_at.to_rfc3339()));
+        }
+        if from_env {
+            rt.out
+                .print_message("Using the session cookie from SHAREPOINT_COOKIE.");
+        } else if session.is_none() {
+            rt.out
+                .print_message("No browser session. Run `sharepoint auth login`.");
+        }
+        if let Some(u) = &user {
+            let who = if u.email.is_empty() {
+                &u.title
+            } else {
+                &u.email
+            };
+            rt.out.print_message(&format!("Verified as {who}"));
         }
     }
     Ok(())
