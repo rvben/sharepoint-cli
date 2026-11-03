@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.0.13](https://github.com/rvben/sharepoint-cli/compare/v0.0.12...v0.0.13) - 2026-11-03
+
+### Added
+
+- **rest**: list OneDrive document libraries as business drives ([d542480](https://github.com/rvben/sharepoint-cli/commit/d542480df20ed8ec8f5860b42a9f0724668df0cc))
+- add SharePoint REST backend with browser-session login ([ae7759b](https://github.com/rvben/sharepoint-cli/commit/ae7759b211120a505907f144ebafaf78be416376))
+- **nix**: add reproducible packages and native CI checks ([ea64c30](https://github.com/rvben/sharepoint-cli/commit/ea64c303ad31a41d7f7342640fb85b55d10cc8c8))
+
 ## [0.0.12](https://github.com/rvben/sharepoint-cli/compare/v0.0.11...v0.0.12) - 2026-09-27
 
 ### Fixed

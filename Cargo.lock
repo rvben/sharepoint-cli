@@ -1721,7 +1721,7 @@ dependencies = [
 
 [[package]]
 name = "sharepoint-cli"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "assert_cmd",
  "base64",
