@@ -4,7 +4,7 @@ use crate::backend::Backend;
 use crate::cli::{Runtime, SitesCmd};
 use crate::config;
 use crate::error::{CliError, Result};
-use crate::graph::{Cursor, decode_cursor, encode_cursor, sites};
+use crate::graph::{decode_cursor, encode_cursor, page_cursor, sites};
 
 pub async fn run(rt: &Runtime, cmd: SitesCmd) -> Result<()> {
     match cmd {
@@ -41,8 +41,10 @@ async fn list(
     let mut items = Vec::new();
     let mut source_label: &str;
 
-    let out_cursor: Option<Cursor> = 'outer: loop {
+    let mut seen = std::collections::HashSet::new();
+    let out_cursor = 'outer: loop {
         let res = backend.list_sites(query, current_url.as_deref()).await?;
+        crate::pagination::record_page(&mut seen, &res.fetched_url)?;
         source_label = match res.source {
             sites::SiteListSource::Followed => "followed",
             sites::SiteListSource::Search => "search",
@@ -54,25 +56,18 @@ async fn list(
             }
             items.push(s.clone());
             if !all && items.len() >= limit {
-                // Mid-page: cursor points back at the same URL with updated skip.
-                let consumed_in_page = idx + 1;
-                break 'outer Some(Cursor {
-                    next: Some(res.fetched_url),
-                    skip: consumed_in_page,
-                });
+                break 'outer page_cursor(&res.fetched_url, res.next_url, idx + 1, res.items.len());
             }
         }
         skip = 0;
 
         if all {
-            if res.next_url.is_none() {
-                // Exhausted.
-                break None;
+            match res.next_url {
+                Some(url) => current_url = Some(url),
+                None => break None,
             }
-            current_url = res.next_url;
         } else {
-            // Not --all: emit next cursor pointing at the Graph nextLink.
-            break res.next_url.map(|url| Cursor {
+            break res.next_url.map(|url| crate::graph::Cursor {
                 next: Some(url),
                 skip: 0,
             });

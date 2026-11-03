@@ -1,4 +1,5 @@
-use assert_cmd::Command;
+mod support;
+
 use chrono::{Duration, Utc};
 use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
@@ -78,8 +79,7 @@ async fn files_find_returns_matches_with_query() {
     let dir = tempfile::tempdir().unwrap();
     seed_cache(dir.path());
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
+    support::isolated_command(dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")
@@ -141,8 +141,7 @@ async fn files_find_filters_by_glob() {
     let dir = tempfile::tempdir().unwrap();
     seed_cache(dir.path());
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
+    support::isolated_command(dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")

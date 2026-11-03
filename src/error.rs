@@ -16,6 +16,8 @@ pub enum CliError {
     NotFound(String),
     /// The remote API (Graph or SharePoint REST) returned a non-2xx error (exit 5).
     Api { status: u16, message: String },
+    /// The API returned malformed data or an unsafe/invalid continuation (exit 5).
+    Protocol(String),
     /// Rate limited by Microsoft 365 (exit 6).
     RateLimit,
     /// Underlying HTTP transport error (exit 1).
@@ -33,6 +35,7 @@ impl fmt::Display for CliError {
             CliError::Conflict(m) => write!(f, "{m}"),
             CliError::NotFound(m) => write!(f, "{m}"),
             CliError::Api { status, message } => write!(f, "API {status}: {message}"),
+            CliError::Protocol(message) => write!(f, "invalid API response: {message}"),
             CliError::RateLimit => write!(f, "rate limited by Microsoft 365"),
             CliError::Http(m) => write!(f, "{m}"),
             CliError::Other(m) => write!(f, "{m}"),
@@ -76,7 +79,7 @@ pub fn exit_code_for(err: &CliError) -> i32 {
         CliError::Input(_) | CliError::ReadOnly(_) => exit_codes::INPUT,
         CliError::Auth(_) => exit_codes::AUTH,
         CliError::NotFound(_) => exit_codes::NOT_FOUND,
-        CliError::Api { .. } => exit_codes::API,
+        CliError::Api { .. } | CliError::Protocol(_) => exit_codes::API,
         CliError::RateLimit => exit_codes::RATE_LIMIT,
         CliError::Conflict(_) => exit_codes::CONFLICT,
         CliError::Http(_) | CliError::Other(_) => exit_codes::GENERAL,
@@ -91,7 +94,7 @@ pub fn kind_for(err: &CliError) -> &'static str {
         CliError::ReadOnly(_) => "read_only",
         CliError::Conflict(_) => "conflict",
         CliError::NotFound(_) => "not_found",
-        CliError::Api { .. } => "api_error",
+        CliError::Api { .. } | CliError::Protocol(_) => "api_error",
         CliError::RateLimit => "rate_limit",
         CliError::Http(_) | CliError::Other(_) => "unexpected_error",
     }

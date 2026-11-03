@@ -1,13 +1,10 @@
-#![cfg(target_os = "linux")]
-
-use assert_cmd::Command;
+mod support;
 
 #[test]
 fn sites_use_writes_default_site_to_config() {
     let dir = tempfile::tempdir().unwrap();
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
+    support::isolated_command(dir.path())
         .env("XDG_CONFIG_HOME", dir.path())
         // Cache dir must also be set to avoid reading the real token cache.
         .env("XDG_CACHE_HOME", dir.path())
@@ -40,8 +37,7 @@ fn sites_use_is_idempotent_on_second_call() {
     let dir = tempfile::tempdir().unwrap();
 
     for _ in 0..2 {
-        Command::cargo_bin("sharepoint")
-            .unwrap()
+        support::isolated_command(dir.path())
             .env("XDG_CONFIG_HOME", dir.path())
             .env("XDG_CACHE_HOME", dir.path())
             .env("SHAREPOINT_TENANT_ID", "contoso")

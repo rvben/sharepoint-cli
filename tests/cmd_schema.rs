@@ -1,4 +1,5 @@
-use assert_cmd::Command;
+mod support;
+
 use predicates::prelude::*;
 
 /// The clispec v0.3 JSON Schema, vendored so the test runs offline.
@@ -10,11 +11,7 @@ const CLISPEC_V0_3: &str = include_str!("fixtures/clispec-v0.3.json");
 fn schema_works_without_credentials() {
     let dir = tempfile::tempdir().unwrap();
 
-    let output = Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
+    let output = support::isolated_command(dir.path())
         .env("XDG_CONFIG_HOME", dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .args(["schema"])
@@ -53,8 +50,8 @@ fn schema_works_without_credentials() {
 
 #[test]
 fn schema_can_select_one_command() {
-    Command::cargo_bin("sharepoint")
-        .unwrap()
+    let dir = tempfile::tempdir().unwrap();
+    support::isolated_command(dir.path())
         .args(["schema", "--command", "files stat"])
         .assert()
         .success()
@@ -67,11 +64,7 @@ fn schema_can_select_one_command() {
 #[test]
 fn doctor_offline_is_actionable_without_configuration() {
     let dir = tempfile::tempdir().unwrap();
-    let output = Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
+    let output = support::isolated_command(dir.path())
         .env("XDG_CONFIG_HOME", dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .args(["doctor", "--offline"])
@@ -91,11 +84,7 @@ fn doctor_offline_is_actionable_without_configuration() {
 fn schema_validates_against_clispec_v0_3() {
     let dir = tempfile::tempdir().unwrap();
 
-    let output = Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
+    let output = support::isolated_command(dir.path())
         .env("XDG_CONFIG_HOME", dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .args(["schema"])
@@ -131,11 +120,7 @@ fn schema_validates_against_clispec_v0_3() {
 fn schema_errors_all_have_exit_codes() {
     let dir = tempfile::tempdir().unwrap();
 
-    let output = Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
+    let output = support::isolated_command(dir.path())
         .env("XDG_CONFIG_HOME", dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .args(["schema"])
@@ -165,11 +150,7 @@ fn schema_errors_all_have_exit_codes() {
 fn schema_all_leaf_commands_have_mutating() {
     let dir = tempfile::tempdir().unwrap();
 
-    let output = Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
+    let output = support::isolated_command(dir.path())
         .env("XDG_CONFIG_HOME", dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .args(["schema"])

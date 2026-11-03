@@ -1,4 +1,5 @@
-use assert_cmd::Command;
+mod support;
+
 use predicates::str::contains;
 use sharepoint_cli::graph::{Cursor, encode_cursor};
 
@@ -12,11 +13,7 @@ fn page_token_pointing_at_attacker_host_is_rejected() {
 
     let dir = tempfile::tempdir().unwrap();
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
+    support::isolated_command(dir.path())
         .env("XDG_CONFIG_HOME", dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .env(

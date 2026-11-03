@@ -1,4 +1,4 @@
-//! Authentication subsystem (device-code flow only in v0.1).
+//! Authentication: Graph device-code flow and SharePoint REST browser sessions.
 //!
 //! `AuthContext` is the runtime entrypoint: every Graph call goes through
 //! `access_token()`, which automatically refreshes when the cached token is

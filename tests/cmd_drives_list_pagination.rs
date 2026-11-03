@@ -1,4 +1,5 @@
-use assert_cmd::Command;
+mod support;
+
 use chrono::{Duration, Utc};
 use sharepoint_cli::auth::token_cache::{Account, CacheEntry, cache_key, upsert};
 use wiremock::matchers::{method, path, query_param, query_param_is_missing};
@@ -75,8 +76,7 @@ async fn drives_list_all_follows_next_link() {
     let dir = tempfile::tempdir().unwrap();
     seed_cache(dir.path());
 
-    let out = Command::cargo_bin("sharepoint")
-        .unwrap()
+    let out = support::isolated_command(dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")

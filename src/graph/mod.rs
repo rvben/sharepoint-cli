@@ -47,8 +47,7 @@ impl GraphClient {
     pub async fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         let resp = self.send(Method::GET, path, None).await?;
         let body = resp.text().await?;
-        serde_json::from_str(&body)
-            .map_err(|e| CliError::Other(format!("graph response not JSON: {e}; body={body}")))
+        serde_json::from_str(&body).map_err(|e| CliError::Protocol(format!("Graph JSON: {e}")))
     }
 
     /// Perform a request that returns a streaming body (e.g., download).
@@ -60,6 +59,10 @@ impl GraphClient {
         body: Option<Vec<u8>>,
     ) -> Result<Response> {
         let url = self.url(path).await;
+        // Validate server-provided continuations as well as user page tokens,
+        // before loading credentials or attaching a bearer token.
+        validate_token_host(&self.graph_endpoint().await, &url)
+            .map_err(|e| CliError::Protocol(e.to_string()))?;
         let mut attempt: u32 = 0;
         loop {
             let token = self.auth.access_token().await?;
@@ -107,7 +110,9 @@ impl GraphClient {
                 && attempt < MAX_RETRIES
                 && matches!(method, Method::GET | Method::HEAD)
             {
-                let secs = 2u64.pow(attempt);
+                let secs = retry_after
+                    .map(|d| d.as_secs())
+                    .unwrap_or_else(|| 2u64.pow(attempt));
                 sleep(Duration::from_secs(secs)).await;
                 attempt += 1;
                 continue;
@@ -126,7 +131,9 @@ impl GraphClient {
     pub(crate) async fn page_all<T: DeserializeOwned>(&self, first_path: &str) -> Result<Vec<T>> {
         let mut acc = Vec::new();
         let mut next = Some(first_path.to_string());
+        let mut seen = std::collections::HashSet::new();
         while let Some(p) = next.take() {
+            crate::pagination::record_page(&mut seen, &self.url(&p).await)?;
             let page: PagedResponse<T> = self.get_json(&p).await?;
             acc.extend(page.value);
             next = page.next_link;
@@ -171,6 +178,26 @@ pub struct Cursor {
     pub skip: usize,
 }
 
+/// Resume inside the fetched page only when it still has unconsumed items.
+pub(crate) fn page_cursor(
+    fetched: &str,
+    next: Option<String>,
+    consumed: usize,
+    page_len: usize,
+) -> Option<Cursor> {
+    if consumed < page_len {
+        Some(Cursor {
+            next: Some(fetched.to_owned()),
+            skip: consumed,
+        })
+    } else {
+        next.map(|url| Cursor {
+            next: Some(url),
+            skip: 0,
+        })
+    }
+}
+
 /// Encode a `Cursor` as a base64url string suitable for the `--page` / `next`
 /// field. The encoding is base64(JSON) so the token is opaque to the caller.
 pub fn encode_cursor(cursor: &Cursor) -> String {
@@ -180,9 +207,8 @@ pub fn encode_cursor(cursor: &Cursor) -> String {
 }
 
 /// Decode a `--page` token back to a `Cursor`, validating that any URL in
-/// `cursor.next` has a host matching the configured Graph endpoint.
-/// Tokens whose host does not match are rejected to prevent bearer-token
-/// leakage to untrusted hosts.
+/// `cursor.next` has the same origin (scheme, host, and port) as the API endpoint.
+/// Reject credentials in URLs and foreign origins before attaching credentials.
 pub(crate) fn decode_cursor(graph_endpoint: &str, token: &str) -> Result<Cursor> {
     use base64::Engine as _;
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
@@ -198,9 +224,7 @@ pub(crate) fn decode_cursor(graph_endpoint: &str, token: &str) -> Result<Cursor>
     Ok(cursor)
 }
 
-/// Validate that `candidate` URL has the same host as `graph_endpoint`.
-/// Rejects tokens that point at an unexpected host to prevent bearer-token
-/// leakage.
+/// Validate the complete origin of a page token or server continuation.
 fn validate_token_host(graph_endpoint: &str, candidate: &str) -> Result<()> {
     let token_url = url::Url::parse(candidate)
         .map_err(|_| CliError::Input("invalid page token (not a URL)".into()))?;
@@ -209,11 +233,12 @@ fn validate_token_host(graph_endpoint: &str, candidate: &str) -> Result<()> {
     let allowed_host = allowed
         .host_str()
         .ok_or_else(|| CliError::Other("graph_endpoint must have a host".into()))?;
-    if token_url.host_str() != Some(allowed_host) {
+    if token_url.origin() != allowed.origin()
+        || !token_url.username().is_empty()
+        || token_url.password().is_some()
+    {
         return Err(CliError::Input(format!(
-            "page token host mismatch: token points at {:?}, expected {:?} — refusing to follow untrusted host",
-            token_url.host_str(),
-            allowed_host
+            "URL host or origin mismatch; refusing to follow untrusted host (expected {allowed_host})"
         )));
     }
     Ok(())

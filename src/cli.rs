@@ -61,6 +61,16 @@ pub struct Cli {
     pub command: Command,
 }
 
+impl Cli {
+    pub fn output_format(&self) -> OutputFormat {
+        if self.json && self.output == OutputFormat::Auto {
+            OutputFormat::Json
+        } else {
+            self.output
+        }
+    }
+}
+
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Configure a profile and optionally sign in (device code for graph, browser for rest).
@@ -111,7 +121,7 @@ pub enum AuthCmd {
         #[arg(long)]
         offline: bool,
         /// Maximum number of accounts to show (graph backend only).
-        #[arg(long, default_value_t = 50)]
+        #[arg(long, default_value_t = 50, value_parser = positive_limit)]
         limit: usize,
         /// Opaque pagination cursor from a previous response's `next` field.
         #[arg(long)]
@@ -161,7 +171,7 @@ pub enum SitesCmd {
     List {
         #[arg(long)]
         query: Option<String>,
-        #[arg(long, default_value_t = 50)]
+        #[arg(long, default_value_t = 50, value_parser = positive_limit)]
         limit: usize,
         #[arg(long)]
         all: bool,
@@ -183,10 +193,13 @@ pub enum DrivesCmd {
     /// List drives (libraries) for a site reference.
     List {
         site: String,
-        #[arg(long, default_value_t = 50)]
+        #[arg(long, default_value_t = 50, value_parser = positive_limit)]
         limit: usize,
         #[arg(long)]
         all: bool,
+        /// Opaque pagination cursor from a previous response's `next` field.
+        #[arg(long)]
+        page: Option<String>,
         /// Comma-separated output fields to include (e.g. id,name,drive_type).
         #[arg(long, value_delimiter = ',')]
         fields: Vec<String>,
@@ -201,7 +214,7 @@ pub enum FilesCmd {
         reference: String,
         #[arg(short = 'r', long)]
         recursive: bool,
-        #[arg(long)]
+        #[arg(long, value_parser = positive_limit)]
         limit: Option<usize>,
         #[arg(long)]
         all: bool,
@@ -234,7 +247,7 @@ pub enum FilesCmd {
         query: Option<String>,
         #[arg(long)]
         name: Option<String>,
-        #[arg(long, default_value_t = 200)]
+        #[arg(long, default_value_t = 200, value_parser = positive_limit)]
         limit: usize,
         #[arg(long)]
         all: bool,
@@ -271,14 +284,7 @@ impl Runtime {
         let cache_path = config::token_cache_path()?;
         let session_path = config::session_store_path()?;
         Ok(Self {
-            out: OutputConfig::new(
-                if cli.json && cli.output == OutputFormat::Auto {
-                    OutputFormat::Json
-                } else {
-                    cli.output
-                },
-                cli.quiet,
-            ),
+            out: OutputConfig::new(cli.output_format(), cli.quiet),
             cfg,
             config_file,
             config_path,
@@ -310,4 +316,12 @@ pub async fn run(cli: Cli) -> Result<()> {
         Command::Files(sub) => crate::commands::files::run(&rt, sub).await,
         Command::Doctor { offline } => crate::commands::doctor::run(&rt, offline).await,
     }
+}
+
+fn positive_limit(value: &str) -> std::result::Result<usize, String> {
+    value
+        .parse::<usize>()
+        .ok()
+        .filter(|n| *n > 0)
+        .ok_or_else(|| "limit must be a positive integer".to_owned())
 }

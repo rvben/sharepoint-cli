@@ -1,6 +1,5 @@
-#![cfg(target_os = "linux")]
+mod support;
 
-use assert_cmd::Command;
 use chrono::{Duration, Utc};
 use predicates::str::contains;
 use sharepoint_cli::auth::token_cache::{Account, CacheEntry, cache_key, load, upsert};
@@ -41,8 +40,7 @@ fn auth_logout_removes_matching_tenant_entries() {
     )
     .unwrap();
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
+    support::isolated_command(dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")
@@ -83,8 +81,7 @@ fn auth_logout_is_no_op_when_no_matching_entry() {
     )
     .unwrap();
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
+    support::isolated_command(dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")

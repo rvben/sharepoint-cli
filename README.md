@@ -97,7 +97,7 @@ sharepoint files ls <site>:<library>/
 
 # Stat / download / search
 sharepoint files stat   <site>:<library>/path/to/file
-sharepoint files download <site>:<library>/path/to/file -o ./out.bin
+sharepoint files download <site>:<library>/path/to/file --path ./out.bin
 sharepoint files find   <site>:<library>/ --name '*.pdf'
 sharepoint doctor
 ```
@@ -122,6 +122,37 @@ input error instead.
 - `--json` (or non-TTY stdout) emits machine-readable JSON on stdout.
 - `--quiet` suppresses status messages.
 - `--no-color` and the standard `NO_COLOR` environment variable disable ANSI output.
+- Errors go to stderr; JSON errors have the shape
+  `{"error":{"kind":"not_found","message":"…","exit_code":4}}`.
+  `--quiet` keeps errors visible. Exit codes are 0 (success), 1 (transport/local
+  failure), 2 (invalid input/read-only), 3 (authentication/access denied),
+  4 (not found), 5 (API failure), 6 (rate limit), and 7 (conflict).
+
+List responses contain `items`, `total`, and an opaque `next` cursor. Pass a
+non-null cursor back with `--page`; stop when `next` is null. `--limit` must be
+positive and sets an upper bound, so a server page or a search filtered by
+`--name` can return fewer items. Use `--all` for sites, drives, file listings,
+and search to fetch all remaining pages. `files ls --recursive` returns the
+complete tree and cannot be combined with pagination flags.
+For sites and files, `total` counts the returned items. For drives and Graph
+cached accounts, it counts the complete collection before limiting.
+Graph `auth status` supports `--limit` and `--page`; REST status describes a
+single host session and rejects `--page`.
+
+Downloads use `--path FILE`, with parent directories created as needed. A
+completed transfer replaces an existing destination only with `--overwrite`;
+transfer errors leave the destination file unchanged and remove their staging
+file. Parent directories created for a download remain. Abrupt process termination
+can leave a `.sharepoint-download-*` staging file beside the destination.
+`--overwrite` replaces the file entry (including a symlink), rather than writing
+through it; existing metadata and hard links are not preserved. On Unix,
+downloaded files are private to their owner.
+Without `--overwrite`, a file created during the transfer is also protected.
+`--path -` writes raw file bytes to stdout, including in JSON mode; stream
+failures can leave partial bytes on stdout, with the error on stderr.
+The legacy `--output FILE` and `-o FILE` aliases work **after** `files download`.
+Put the global `--output json|text|auto` **before** `files download`, and prefer
+`--path` for an unambiguous destination.
 
 Suite-level discovery is available without guessing: use `sharepoint doctor --offline`, `sharepoint schema --command 'files stat'`, `sharepoint config show`, and `sharepoint completions <shell>`.
 

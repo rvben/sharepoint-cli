@@ -1,3 +1,5 @@
+mod support;
+
 use assert_cmd::Command;
 use chrono::{Duration, Utc};
 use sharepoint_cli::auth::token_cache::{Account, CacheEntry, cache_key, upsert};
@@ -88,7 +90,7 @@ async fn mount_page2(server: &MockServer) {
 }
 
 fn cli(server: &MockServer, dir: &tempfile::TempDir) -> Command {
-    let mut c = Command::cargo_bin("sharepoint").unwrap();
+    let mut c = support::isolated_command(dir.path());
     c.env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")

@@ -140,7 +140,7 @@ async fn drives_list_refuses_collection_continuations_to_another_origin() {
             "https://contoso.sharepoint.com/sites/Marketing",
         ])
         .assert()
-        .code(2)
+        .code(5)
         .stderr(predicates::str::contains("untrusted host"));
 }
 
@@ -168,6 +168,6 @@ async fn drives_list_reports_repeated_collection_continuations_without_hanging()
             "https://contoso.sharepoint.com/sites/Marketing",
         ])
         .assert()
-        .code(1)
+        .code(5)
         .stderr(predicates::str::contains("repeated a continuation URL"));
 }

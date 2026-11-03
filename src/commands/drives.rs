@@ -11,8 +11,9 @@ pub async fn run(rt: &Runtime, cmd: DrivesCmd) -> Result<()> {
             site,
             limit,
             all,
+            page,
             fields,
-        } => list(rt, &site, limit, all, &fields).await,
+        } => list(rt, &site, limit, all, page.as_deref(), &fields).await,
     }
 }
 
@@ -21,6 +22,7 @@ async fn list(
     site_input: &str,
     limit: usize,
     all: bool,
+    page: Option<&str>,
     fields: &[String],
 ) -> Result<()> {
     let backend = Backend::from_runtime(rt)?;
@@ -53,11 +55,17 @@ async fn list(
             rt.cfg.default_site.as_deref(),
         )
         .await?;
-    let mut all_drives = backend.list_drives(&site).await?;
+    let scope = format!("drives:{:?}:{}", rt.cfg.backend, site.web_url);
+    let offset = crate::pagination::offset(page, &scope)?;
+    let all_drives = backend.list_drives(&site).await?;
     let total = all_drives.len();
-    if !all && all_drives.len() > limit {
-        all_drives.truncate(limit);
-    }
+    let all_drives: Vec<_> = all_drives
+        .into_iter()
+        .skip(offset)
+        .take(if all { usize::MAX } else { limit })
+        .collect();
+    let next =
+        crate::pagination::next_offset(&scope, offset.saturating_add(all_drives.len()), total);
 
     if rt.out.json {
         let items: Vec<_> = all_drives
@@ -76,7 +84,7 @@ async fn list(
             .collect();
         rt.out.print_json(&serde_json::json!({
             "total": total,
-            "next": null,
+            "next": next,
             "items": items,
         }));
     } else {

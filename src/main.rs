@@ -1,6 +1,6 @@
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 use sharepoint_cli::cli::{self, Cli};
 use sharepoint_cli::error::{CliError, exit_codes};
@@ -28,14 +28,34 @@ use sharepoint_cli::output::{OutputConfig, OutputFormat};
 fn rewrite_argv(args: impl Iterator<Item = std::ffi::OsString>) -> Vec<std::ffi::OsString> {
     let args: Vec<std::ffi::OsString> = args.collect();
 
-    // Locate `files` followed immediately-or-eventually by `download`.
-    let files_pos = args.iter().position(|a| a == "files");
-    let download_pos = files_pos.and_then(|fp| {
-        args[fp + 1..]
-            .iter()
-            .position(|a| a == "download")
-            .map(|rel| fp + 1 + rel)
-    });
+    // Recognize command tokens, skipping global option values that happen to
+    // be named `files` or `download`.
+    let mut files = false;
+    let mut download_pos = None;
+    let mut i = 1;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--" {
+            break;
+        }
+        if takes_value(arg) {
+            i += 2;
+            continue;
+        }
+        if arg.to_str().is_some_and(|s| s.starts_with('-')) {
+            i += 1;
+            continue;
+        }
+        if !files && arg == "files" {
+            files = true;
+        } else if files && arg == "download" {
+            download_pos = Some(i);
+            break;
+        } else {
+            break;
+        }
+        i += 1;
+    }
 
     let Some(dl_pos) = download_pos else {
         return args;
@@ -69,6 +89,10 @@ fn rewrite_argv(args: impl Iterator<Item = std::ffi::OsString>) -> Vec<std::ffi:
         if arg == "--output" {
             result.push("--path".into());
             i += 1;
+            if let Some(value) = tail.get(i) {
+                result.push(value.clone());
+                i += 1;
+            }
             continue;
         }
 
@@ -83,6 +107,10 @@ fn rewrite_argv(args: impl Iterator<Item = std::ffi::OsString>) -> Vec<std::ffi:
         if arg == "-o" {
             result.push("--path".into());
             i += 1;
+            if let Some(value) = tail.get(i) {
+                result.push(value.clone());
+                i += 1;
+            }
             continue;
         }
 
@@ -103,14 +131,39 @@ fn rewrite_argv(args: impl Iterator<Item = std::ffi::OsString>) -> Vec<std::ffi:
 
         result.push(arg.clone());
         i += 1;
+        if takes_value(arg)
+            && let Some(value) = tail.get(i)
+        {
+            result.push(value.clone());
+            i += 1;
+        }
     }
 
     result
 }
 
+fn takes_value(arg: &std::ffi::OsStr) -> bool {
+    let Some(spelling) = arg.to_str() else {
+        return false;
+    };
+    // --path is local to downloads; all other value flags come from clap's
+    // definition so future global options cannot break alias recognition.
+    spelling == "--path"
+        || Cli::command().get_arguments().any(|declared| {
+            declared.get_action().takes_values()
+                && (declared
+                    .get_long()
+                    .is_some_and(|name| spelling == format!("--{name}"))
+                    || declared
+                        .get_short()
+                        .is_some_and(|name| spelling == format!("-{name}")))
+        })
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
-    let cli = match Cli::try_parse_from(rewrite_argv(std::env::args_os())) {
+    let args = rewrite_argv(std::env::args_os());
+    let cli = match Cli::try_parse_from(&args) {
         Ok(c) => c,
         Err(e) => {
             // Honor clap's exit semantics for --help / --version: clap has
@@ -126,8 +179,18 @@ async fn main() -> ExitCode {
                 let code: u8 = if e.use_stderr() { 2 } else { 0 };
                 return ExitCode::from(code);
             }
-            // Real parse errors use auto-format (JSON when piped).
-            let out = OutputConfig::new(OutputFormat::Auto, false);
+            // Preserve an explicit format even when the command is invalid.
+            let matches = Cli::command().ignore_errors(true).get_matches_from(&args);
+            let format = matches
+                .get_one::<OutputFormat>("output")
+                .copied()
+                .unwrap_or(OutputFormat::Auto);
+            let format = if matches.get_flag("json") && format == OutputFormat::Auto {
+                OutputFormat::Json
+            } else {
+                format
+            };
+            let out = OutputConfig::new(format, false);
             let msg = e.to_string();
             let first_line = msg
                 .lines()
@@ -139,7 +202,7 @@ async fn main() -> ExitCode {
             return ExitCode::from(exit as u8);
         }
     };
-    let out = OutputConfig::new(cli.output, cli.quiet);
+    let out = OutputConfig::new(cli.output_format(), cli.quiet);
     match cli::run(cli).await {
         Ok(()) => ExitCode::from(exit_codes::SUCCESS as u8),
         Err(err) => ExitCode::from(out.render_error(&err) as u8),

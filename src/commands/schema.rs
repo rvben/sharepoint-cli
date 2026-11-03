@@ -102,7 +102,7 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                         "args": [
                             {"name": "--offline", "type": "boolean", "required": false, "default": false, "description": "Inspect cached credentials without contacting SharePoint or Microsoft Graph."},
                             {"name": "--limit", "type": "integer", "required": false, "default": 50, "description": "Maximum number of accounts to show (graph backend only)."},
-                            {"name": "--page", "type": "string", "required": false, "description": "Opaque pagination cursor from a previous response's `next` field."},
+                            {"name": "--page", "type": "string", "required": false, "description": "Opaque pagination cursor from a previous response's `next` field (Graph accounts only)."},
                             {"name": "--fields", "type": "string[]", "required": false, "description": "Comma-separated item fields to include (e.g. username,expires_at; rest backend: host,username,captured_at)."}
                         ],
                         "output_fields": [
@@ -263,6 +263,7 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                             {"name": "site", "type": "string", "required": true, "description": "Site reference: URL, spo://SiteName, or 'default'."},
                             {"name": "--limit", "type": "integer", "required": false, "default": 50, "description": "Maximum number of items to return."},
                             {"name": "--all", "type": "boolean", "required": false, "default": false, "description": "Return all drives (ignores --limit)."},
+                            {"name": "--page", "type": "string", "required": false, "description": "Opaque pagination cursor from a previous response's `next` field."},
                             {"name": "--fields", "type": "string[]", "required": false, "description": "Comma-separated fields to include in each item (e.g. id,name,drive_type)."}
                         ],
                         "output_fields": [
@@ -517,7 +518,7 @@ fn enrich_v0_3(schema: &mut Value) {
 
         let unbounded = matches!(
             name.as_str(),
-            "auth status" | "sites list" | "files ls" | "files find"
+            "auth status" | "sites list" | "drives list" | "files ls" | "files find"
         );
         object.insert(
             "cardinality".into(),
@@ -542,6 +543,15 @@ fn enrich_v0_3(schema: &mut Value) {
             object.insert("example".into(), json!({"args":["config","show"]}));
         }
 
+        if let Some(args) = object.get_mut("args").and_then(Value::as_array_mut) {
+            for arg in args {
+                if arg["name"] == "--limit" {
+                    let description = arg["description"].as_str().unwrap_or("");
+                    arg["description"] =
+                        json!(format!("{description} Must be a positive integer."));
+                }
+            }
+        }
         if let Some(fields) = object
             .get_mut("output_fields")
             .and_then(Value::as_array_mut)

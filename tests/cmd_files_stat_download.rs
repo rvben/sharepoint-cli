@@ -1,6 +1,5 @@
-#![cfg(target_os = "linux")]
+mod support;
 
-use assert_cmd::Command;
 use chrono::{Duration, Utc};
 use predicates::str::contains;
 use sharepoint_cli::auth::token_cache::{Account, CacheEntry, cache_key, upsert};
@@ -67,8 +66,7 @@ async fn files_stat_includes_download_url() {
     let dir = tempfile::tempdir().unwrap();
     seed_cache(dir.path());
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
+    support::isolated_command(dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")
@@ -101,8 +99,7 @@ async fn files_download_writes_stdout_with_dash() {
     let dir = tempfile::tempdir().unwrap();
     seed_cache(dir.path());
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
+    support::isolated_command(dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .env("SHAREPOINT_TENANT_ID", "contoso")
         .env("SHAREPOINT_CLIENT_ID", "client-1")

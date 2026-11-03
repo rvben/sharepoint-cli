@@ -163,8 +163,10 @@ pub(crate) async fn list_children_recursive(
     let mut stack = vec![path.to_string()];
     while let Some(p) = stack.pop() {
         let mut next_url: Option<String> = None;
+        let mut seen = std::collections::HashSet::new();
         loop {
             let page = list_children(graph, drive_id, &p, next_url.as_deref()).await?;
+            crate::pagination::record_page(&mut seen, &page.fetched_url)?;
             for item in page.items {
                 if item.folder.is_some() {
                     let child_path = item_path(&p, &item.name);

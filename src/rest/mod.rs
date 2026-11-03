@@ -189,8 +189,7 @@ impl RestClient {
     pub async fn get_json<T: DeserializeOwned>(&self, url: &str) -> Result<T> {
         let resp = self.get(url).await?;
         let text = resp.text().await?;
-        serde_json::from_str(&text)
-            .map_err(|e| CliError::Other(format!("parse SharePoint response: {e}")))
+        serde_json::from_str(&text).map_err(|e| CliError::Protocol(format!("SharePoint JSON: {e}")))
     }
 
     /// Read every page of a nometadata collection. Continuations are resolved
@@ -201,15 +200,19 @@ impl RestClient {
         let mut values = Vec::new();
         loop {
             let mut current = url::Url::parse(&next).map_err(|e| {
-                CliError::Other(format!("invalid SharePoint continuation URL: {e}"))
+                CliError::Protocol(format!("invalid SharePoint continuation URL: {e}"))
             })?;
             current.set_fragment(None);
             if !seen.insert(current.to_string()) {
-                return Err(CliError::Other(
+                return Err(CliError::Protocol(
                     "SharePoint collection repeated a continuation URL".into(),
                 ));
             }
-            let page: Collection<T> = self.get_json(current.as_str()).await?;
+            let page: Collection<T> =
+                self.get_json(current.as_str()).await.map_err(|e| match e {
+                    CliError::Input(message) => CliError::Protocol(message),
+                    other => other,
+                })?;
             values.extend(page.value);
             match page.next {
                 None => return Ok(values),
@@ -217,7 +220,7 @@ impl RestClient {
                     next = current
                         .join(&link)
                         .map_err(|e| {
-                            CliError::Other(format!("invalid SharePoint continuation URL: {e}"))
+                            CliError::Protocol(format!("invalid SharePoint continuation URL: {e}"))
                         })?
                         .to_string();
                 }

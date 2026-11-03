@@ -1,10 +1,9 @@
-#![cfg(target_os = "linux")]
-
 //! After a successful device-code login with a domain tenant configured,
 //! the resolved tenant GUID from the id token must be persisted to the
 //! profile so that subsequent commands look up the cache by GUID.
 
-use assert_cmd::Command;
+mod support;
+
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde_json::json;
@@ -49,11 +48,7 @@ async fn login_canonicalizes_domain_tenant_to_guid_in_config() {
 
     let dir = tempfile::tempdir().unwrap();
 
-    Command::cargo_bin("sharepoint")
-        .unwrap()
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
+    support::isolated_command(dir.path())
         .env("XDG_CONFIG_HOME", dir.path())
         .env("XDG_CACHE_HOME", dir.path())
         .env("MICROSOFT_LOGIN_ENDPOINT", server.uri())

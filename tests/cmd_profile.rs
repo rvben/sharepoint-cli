@@ -1,14 +1,9 @@
+mod support;
+
 use assert_cmd::Command;
 
 fn isolated(dir: &tempfile::TempDir) -> Command {
-    let mut command = Command::cargo_bin("sharepoint").unwrap();
-    command
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
-        .env("XDG_CONFIG_HOME", dir.path())
-        .env("XDG_CACHE_HOME", dir.path());
-    command
+    support::isolated_command(dir.path())
 }
 
 fn init_profile(dir: &tempfile::TempDir, name: &str) {

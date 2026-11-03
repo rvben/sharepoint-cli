@@ -8,7 +8,7 @@ use crate::cli::{FilesCmd, Runtime};
 use crate::error::{CliError, Result};
 use crate::graph::drives::{Drive, canonical_json};
 use crate::graph::sites::Site;
-use crate::graph::{Cursor, decode_cursor, encode_cursor};
+use crate::graph::{decode_cursor, encode_cursor, page_cursor};
 use crate::output::terminal_width;
 use crate::reference::{ParsedRef, parse};
 
@@ -190,10 +190,12 @@ async fn ls(
 
     let mut items: Vec<_> = Vec::new();
 
-    let out_cursor: Option<Cursor> = 'outer: loop {
+    let mut seen = std::collections::HashSet::new();
+    let out_cursor = 'outer: loop {
         let pageres = backend
             .list_children(&r.site, &r.drive, &r.parsed.path, current_url.as_deref())
             .await?;
+        crate::pagination::record_page(&mut seen, &pageres.fetched_url)?;
 
         for (idx, it) in pageres.items.iter().enumerate() {
             if idx < skip {
@@ -201,24 +203,18 @@ async fn ls(
             }
             items.push(it.clone());
             if !all && items.len() >= effective_limit {
-                // Mid-page: point the cursor back at the same page with updated skip.
-                let consumed_in_page = idx + 1;
-                break 'outer Some(Cursor {
-                    next: Some(pageres.fetched_url),
-                    skip: consumed_in_page,
-                });
+                break 'outer page_cursor(
+                    &pageres.fetched_url,
+                    pageres.next_url,
+                    idx + 1,
+                    pageres.items.len(),
+                );
             }
         }
         skip = 0;
 
         match pageres.next_url {
             None => break None,
-            Some(url) if !all && items.len() >= effective_limit => {
-                break Some(Cursor {
-                    next: Some(url),
-                    skip: 0,
-                });
-            }
             Some(url) => current_url = Some(url),
         }
     };
@@ -281,7 +277,7 @@ async fn download(
 ) -> Result<()> {
     let (backend, r) = resolve(rt, reference).await?;
 
-    // Derive the target filename from the path when --output is not given.
+    // Derive the target filename when --path is not given.
     let derived;
     let target: &str = match output {
         Some(o) => o,
@@ -323,13 +319,44 @@ async fn download(
         })?;
     }
 
-    let mut file = File::create(path)
-        .await
-        .map_err(|e| CliError::Other(format!("create '{target}': {e}")))?;
-
+    // Stage beside the destination so committing the completed download stays
+    // on the same filesystem. Dropping the tempfile cleans up failed transfers.
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let staged = tempfile::Builder::new()
+        .prefix(".sharepoint-download-")
+        .tempfile_in(parent)
+        .map_err(|e| CliError::Other(format!("stage download for '{target}': {e}")))?;
+    let mut file = File::from_std(
+        staged
+            .reopen()
+            .map_err(|e| CliError::Other(format!("open staged download: {e}")))?,
+    );
     let n = backend
         .download_to_writer(&r.site, &r.drive, &r.parsed.path, &mut file)
         .await?;
+    file.sync_all()
+        .await
+        .map_err(|e| CliError::Other(format!("sync download: {e}")))?;
+    drop(file);
+    // persist_noclobber also protects files created while the transfer ran;
+    // an existence check alone would allow a race to overwrite user data.
+    let committed = if overwrite {
+        staged.persist(path)
+    } else {
+        staged.persist_noclobber(path)
+    };
+    committed.map_err(|e| {
+        if !overwrite && e.error.kind() == std::io::ErrorKind::AlreadyExists {
+            CliError::Input(format!(
+                "'{target}' already exists; use --overwrite to replace it"
+            ))
+        } else {
+            CliError::Other(format!("save download to '{target}': {}", e.error))
+        }
+    })?;
     rt.out
         .print_message(&format!("Downloaded {n} byte(s) to {}", path.display()));
     if rt.out.json {
@@ -369,8 +396,10 @@ async fn find(
 
     let mut items = Vec::new();
 
-    let out_cursor: Option<Cursor> = 'outer: loop {
+    let mut seen = std::collections::HashSet::new();
+    let out_cursor = 'outer: loop {
         let res = backend.search(&r.drive, q, current_url.as_deref()).await?;
+        crate::pagination::record_page(&mut seen, &res.fetched_url)?;
 
         for (idx, it) in res.items.iter().enumerate() {
             if idx < skip {
@@ -389,22 +418,18 @@ async fn find(
                 // relies on the glob filter being stateless: re-applying it to the same
                 // items on the resumed page yields identical filter decisions, so no item
                 // is double-emitted or skipped.
-                let consumed_raw = idx + 1;
-                break 'outer Some(Cursor {
-                    next: Some(res.fetched_url),
-                    skip: consumed_raw,
-                });
+                break 'outer page_cursor(&res.fetched_url, res.next_url, idx + 1, res.items.len());
             }
         }
         skip = 0;
 
         if all {
-            if res.next_url.is_none() {
-                break None;
+            match res.next_url {
+                Some(url) => current_url = Some(url),
+                None => break None,
             }
-            current_url = res.next_url;
         } else {
-            break res.next_url.map(|url| Cursor {
+            break res.next_url.map(|url| crate::graph::Cursor {
                 next: Some(url),
                 skip: 0,
             });

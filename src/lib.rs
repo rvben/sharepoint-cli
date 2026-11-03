@@ -17,6 +17,7 @@ pub mod config;
 pub mod error;
 pub mod graph;
 pub mod output;
+pub(crate) mod pagination;
 pub(crate) mod reference;
 pub mod rest;
 pub(crate) mod util;

@@ -2,6 +2,9 @@ use std::path::Path;
 
 use assert_cmd::Command;
 
+#[allow(dead_code)]
+pub mod backend;
+
 /// Keep CLI tests away from the caller's profiles, sessions, and API endpoints.
 pub fn isolated_command(root: &Path) -> Command {
     let mut cmd = Command::cargo_bin("sharepoint").unwrap();

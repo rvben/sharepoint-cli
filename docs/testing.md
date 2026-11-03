@@ -7,6 +7,25 @@ integration tests on Linux, macOS, and Windows. The REST integration tests use
 local HTTP servers and temporary config/cache directories; they need no tenant,
 browser, or credentials.
 
+All Graph command tests run on each platform too; only OS-specific permission
+assertions are conditional. Shared CLI test helpers isolate config/cache files
+and remove inherited SharePoint/Microsoft settings while keeping the operating
+system environment, including Windows `SystemRoot`.
+
+The release contract tests exercise both backends through the compiled CLI:
+
+```sh
+cargo nextest run --test cmd_download_safety --test cmd_backend_contract \
+  --test cmd_collection_pagination --test cmd_flags --test cmd_pagination_safety
+```
+
+They cover completed and interrupted binary downloads, preservation of existing
+files, concurrent destination creation, cleanup, raw stdout, legacy flags,
+JSON/text/quiet behavior, structured errors and exit codes, positive limits,
+page boundaries, account/library cursors, foreign origins, and continuation loops.
+A small real HTTP peer closes a response before its declared content length to
+exercise mid-stream failures; other API scenarios use local HTTP mocks.
+
 To run just the REST tests and the config-directory regression test:
 
 ```sh

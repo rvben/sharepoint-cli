@@ -10,14 +10,26 @@ Start from a clean, up-to-date `main` branch and run:
 
 ```sh
 vership preflight
-vership bump patch # or minor/major
-tarry cmd --timeout 20m -- vership verify
+vership bump patch --prepare # or minor/major; creates the release commit locally
+# After approval to push and publish:
+vership release
+# Wait for the tag's Release workflow to finish, then:
+vership verify --targets tag,release,crates,pypi
 ```
 
-Vership runs `make check`, updates the package version and changelog, creates
-the Conventional Commit release commit and tag, and pushes both. The tag starts
-the release workflow. Use `vership release` only when the on-disk version was
-intentionally set in advance.
+Before preparing, inspect `vership status`, `vership config show`, and the
+installed command's `--help`. Preparation runs `make check`, updates the package
+version and changelog, and creates the Conventional Commit release commit.
+Review and test that commit, then use `vership release` to tag and push the
+prepared version without bumping again. The tag starts the release workflow.
+Publishing requires explicit approval; an instruction to release a named version
+provides that authorization.
+
+Wait for CI on Linux, macOS, and Windows and the publication workflow. Verify
+all four targets, download a published binary, check its version and checksum,
+and run `cargo run --example simulator -- smoke --cli /path/to/sharepoint`.
+Finally fetch and fast-forward the primary checkout to the remote default branch,
+confirming that the release tag and remote branch reference the tested commit.
 
 Cargo and Python package versions are kept synchronized as one release unit.
 

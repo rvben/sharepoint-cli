@@ -18,9 +18,19 @@ pub async fn run(rt: &Runtime, cmd: AuthCmd) -> Result<()> {
         (
             BackendKind::Rest,
             AuthCmd::Status {
-                offline, fields, ..
+                offline,
+                fields,
+                page,
+                ..
             },
-        ) => rest_status(rt, offline, &fields).await,
+        ) => {
+            if page.is_some() {
+                return Err(CliError::Input(
+                    "auth status --page is only available for Graph accounts".into(),
+                ));
+            }
+            rest_status(rt, offline, &fields).await
+        }
         (BackendKind::Graph, AuthCmd::Login) => login(rt).await,
         (BackendKind::Graph, AuthCmd::Logout) => logout(rt).await,
         (
@@ -140,9 +150,11 @@ async fn status(
     rt: &Runtime,
     offline: bool,
     limit: usize,
-    _page: Option<&str>,
+    page: Option<&str>,
     fields: &[String],
 ) -> Result<()> {
+    let scope = format!("accounts:{}", rt.cfg.profile_name);
+    let offset = crate::pagination::offset(page, &scope)?;
     let cache = token_cache::load(&rt.cache_path)?;
 
     // Build the full account list.
@@ -169,7 +181,9 @@ async fn status(
         .collect();
 
     let total = all_accounts.len();
-    all_accounts.truncate(limit);
+    let all_accounts: Vec<_> = all_accounts.drain(..).skip(offset).take(limit).collect();
+    let next =
+        crate::pagination::next_offset(&scope, offset.saturating_add(all_accounts.len()), total);
     let identity = if offline || total == 0 {
         None
     } else {
@@ -183,7 +197,7 @@ async fn status(
     if rt.out.json {
         rt.out.print_json(&serde_json::json!({
             "total": total,
-            "next": serde_json::Value::Null,
+            "next": next,
             "items": all_accounts,
             "verified": identity.is_some(),
             "identity": identity,

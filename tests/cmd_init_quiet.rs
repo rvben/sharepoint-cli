@@ -1,14 +1,10 @@
+mod support;
+
 use assert_cmd::Command;
 
 fn isolated() -> (tempfile::TempDir, Command) {
     let dir = tempfile::tempdir().unwrap();
-    let mut command = Command::cargo_bin("sharepoint").unwrap();
-    command
-        .env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .env("HOME", dir.path())
-        .env("XDG_CONFIG_HOME", dir.path())
-        .env("XDG_CACHE_HOME", dir.path());
+    let command = support::isolated_command(dir.path());
     (dir, command)
 }
 
