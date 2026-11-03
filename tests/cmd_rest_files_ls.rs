@@ -35,7 +35,7 @@ async fn mount_lists(server: &MockServer) {
         .and(path("/sites/Marketing/_api/web/lists"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "value": [
-                {"Id": "L1", "Title": "Documents", "RootFolder": {"ServerRelativeUrl": "/sites/Marketing/Shared Documents"}}
+                {"Id": "L1", "Title": "Documents", "BaseTemplate": 101, "RootFolder": {"ServerRelativeUrl": "/sites/Marketing/Shared Documents"}}
             ]
         })))
         .mount(server)

@@ -1,7 +1,7 @@
 #![cfg(target_os = "linux")]
 
 use assert_cmd::Command;
-use wiremock::matchers::{header, method, path};
+use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const COOKIE: &str = "FedAuth=F; rtFa=R";
@@ -33,9 +33,14 @@ async fn mount_web(server: &MockServer) {
 async fn mount_lists(server: &MockServer) {
     Mock::given(method("GET"))
         .and(path("/sites/Marketing/_api/web/lists"))
+        .and(query_param(
+            "$filter",
+            "(BaseTemplate eq 101 or BaseTemplate eq 700) and Hidden eq false",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "value": [
-                {"Id": "L1", "Title": "Documents", "RootFolder": {"ServerRelativeUrl": "/sites/Marketing/Shared Documents"}}
+                {"Id": "L1", "Title": "Documents", "BaseTemplate": 101, "RootFolder": {"ServerRelativeUrl": "/sites/Marketing/Shared Documents"}},
+                {"Id": "L2", "Title": "OneDrive Documents", "BaseTemplate": 700, "RootFolder": {"ServerRelativeUrl": "/sites/Marketing/Documents"}}
             ]
         })))
         .mount(server)
@@ -62,8 +67,11 @@ async fn drives_list_returns_document_libraries() {
         .stdout
         .clone();
     let v: serde_json::Value = serde_json::from_slice(&out).unwrap();
-    assert_eq!(v["total"], 1);
+    assert_eq!(v["total"], 2);
     assert_eq!(v["items"][0]["id"], "L1");
     assert_eq!(v["items"][0]["name"], "Documents");
+    assert_eq!(v["items"][0]["drive_type"], "documentLibrary");
     assert_eq!(v["items"][0]["site"]["id"], "W1");
+    assert_eq!(v["items"][1]["id"], "L2");
+    assert_eq!(v["items"][1]["drive_type"], "business");
 }

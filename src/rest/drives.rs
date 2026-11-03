@@ -22,6 +22,8 @@ struct List {
     id: String,
     #[serde(rename = "Title")]
     title: String,
+    #[serde(rename = "BaseTemplate")]
+    base_template: u32,
     #[serde(rename = "RootFolder")]
     root_folder: RootFolder,
 }
@@ -87,10 +89,19 @@ const FOLDER_SELECT: &str = "UniqueId,Name,ServerRelativeUrl,TimeCreated,TimeLas
 const FILE_SELECT: &str =
     "UniqueId,Name,ServerRelativeUrl,Length,ETag,TimeCreated,TimeLastModified";
 
+/// Graph's `driveType` for a list template: 101 is a regular document library,
+/// 700 the "Documents" library of a OneDrive (`MySiteDocumentLibrary`).
+fn drive_type(base_template: u32) -> &'static str {
+    match base_template {
+        700 => "business",
+        _ => "documentLibrary",
+    }
+}
+
 pub(crate) async fn list_drives(client: &RestClient, site: &Site) -> Result<Vec<Drive>> {
     let url = client.site_api(
         &site.web_url,
-        "/_api/web/lists?$filter=BaseTemplate%20eq%20101%20and%20Hidden%20eq%20false&$select=Id,Title,RootFolder/ServerRelativeUrl&$expand=RootFolder",
+        "/_api/web/lists?$filter=(BaseTemplate%20eq%20101%20or%20BaseTemplate%20eq%20700)%20and%20Hidden%20eq%20false&$select=Id,Title,BaseTemplate,RootFolder/ServerRelativeUrl&$expand=RootFolder",
     )?;
     let resp: ListsResponse = client.get_json(&url).await?;
     Ok(resp
@@ -99,7 +110,7 @@ pub(crate) async fn list_drives(client: &RestClient, site: &Site) -> Result<Vec<
         .map(|l| Drive {
             id: l.id,
             name: l.title,
-            drive_type: "documentLibrary".into(),
+            drive_type: drive_type(l.base_template).into(),
             root_folder: Some(l.root_folder.server_relative_url),
         })
         .collect())
@@ -297,6 +308,12 @@ pub(crate) async fn get_item(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn drive_type_matches_graph() {
+        assert_eq!(drive_type(101), "documentLibrary");
+        assert_eq!(drive_type(700), "business");
+    }
 
     fn drive() -> Drive {
         Drive {

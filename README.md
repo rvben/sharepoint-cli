@@ -186,6 +186,10 @@ sharepoint --profile work doctor
 - The session is stored per host in `$XDG_CACHE_HOME/sharepoint/sessions.json`
   (or `~/.cache/sharepoint/sessions.json`) with mode 0600. When it expires, run
   `sharepoint auth login` again; `sharepoint auth logout` removes it.
+- OneDrive lives on its own host (`contoso-my.sharepoint.com`), so it needs
+  its own profile and `auth login`:
+  `SHAREPOINT_HOST=contoso-my.sharepoint.com sharepoint drives list https://contoso-my.sharepoint.com/personal/jane_contoso_com`
+  lists its `Documents` library with `drive_type` `business`, as Graph does.
 - `sites list` without a query returns all sites visible to you via search
   (the `graph` backend returns followed sites).
 - `files stat` has no `download_url` on this backend.
