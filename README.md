@@ -138,12 +138,27 @@ sharepoint config path
 
 ## Configuration
 
-Config lives at `$XDG_CONFIG_HOME/sharepoint/config.toml` (or `~/.config/sharepoint/config.toml`). Run `sharepoint config path` to print the resolved location.
+Run `sharepoint config path` to print the resolved config location. By default,
+configuration and cached credentials use the native directories for your OS:
 
-You must supply two things before signing in:
+| OS | Configuration | Cached credentials |
+| --- | --- | --- |
+| Linux | `~/.config/sharepoint/` | `~/.cache/sharepoint/` |
+| macOS | `~/Library/Application Support/sharepoint/` | `~/Library/Caches/sharepoint/` |
+| Windows | `%APPDATA%\sharepoint\` | `%LOCALAPPDATA%\sharepoint\` |
+
+Set `XDG_CONFIG_HOME` or `XDG_CACHE_HOME` to an absolute directory to override
+these defaults on any OS. The CLI adds the `sharepoint` subdirectory. Empty or
+relative overrides are ignored. Config is saved as `config.toml`; cached Graph
+tokens and REST sessions use `tokens.json` and `sessions.json`, respectively.
+
+For the default **Graph backend**, supply two things before signing in:
 
 - A **tenant** (your Microsoft 365 domain or tenant GUID).
 - A **client_id** for an Entra public-client app you've registered. The app needs the device-code flow enabled and delegated `Files.Read.All`, `Sites.Read.All`, and `offline_access` scopes. `sharepoint init` walks you through saving both into the active profile.
+
+The **REST backend** needs a SharePoint host and browser sign-in, with no tenant
+or client ID. See [browser-session setup](#without-microsoft-graph-browser-session).
 
 Environment overrides:
 
@@ -162,7 +177,7 @@ backend. It signs in through a real browser and calls the SharePoint REST API
 (`/_api`) with your session cookies. No tenant or client ID is needed.
 
 ```toml
-# ~/.config/sharepoint/config.toml
+# Add to the file printed by `sharepoint config path`
 [profile.work]
 backend = "rest"
 sharepoint_host = "contoso.sharepoint.com"
@@ -183,8 +198,8 @@ sharepoint --profile work doctor
 - A snap-packaged Chromium (the default `chromium` on Ubuntu) won't work: its
   private `/tmp` hides the browser's DevTools port file from the CLI. Point
   `SHAREPOINT_BROWSER` at a non-snap Chrome, Chromium or Edge instead.
-- The session is stored per host in `$XDG_CACHE_HOME/sharepoint/sessions.json`
-  (or `~/.cache/sharepoint/sessions.json`) with mode 0600. When it expires, run
+- The session is stored per host in `sessions.json` in the cache directory
+  above, with mode 0600 on Unix. When it expires, run
   `sharepoint auth login` again; `sharepoint auth logout` removes it.
 - OneDrive lives on its own host (`contoso-my.sharepoint.com`), so it needs
   its own profile and `auth login`:
@@ -200,6 +215,11 @@ sharepoint --profile work doctor
 ## License
 
 MIT
+
+## Testing
+
+See [the testing guide](docs/testing.md) for automated checks and a live
+SharePoint/OneDrive smoke test using a dedicated test tenant.
 
 ## Releasing
 

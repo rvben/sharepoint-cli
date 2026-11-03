@@ -27,7 +27,7 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,7 +38,10 @@ jobs:
       - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
           tool: nextest
-      - run: make test
+      - name: Run unit tests
+        run: cargo nextest run --lib --bin sharepoint --no-tests=pass
+      - name: Run integration tests
+        run: cargo nextest run --test '*'
 
   nix:
     name: Nix (${{ matrix.os }})

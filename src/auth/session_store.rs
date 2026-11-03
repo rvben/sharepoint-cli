@@ -1,7 +1,8 @@
 //! Browser-session cookies for the SharePoint REST backend, keyed by host.
 //!
-//! Stored at `~/.cache/sharepoint/sessions.json` with mode 0600, alongside
-//! the Graph token cache. The cookie header is a bearer secret: never log it.
+//! Stored as `sharepoint/sessions.json` in the configured cache directory,
+//! alongside the Graph token cache, with mode 0600 on Unix.
+//! The cookie header is a bearer secret: never log it.
 
 use std::collections::BTreeMap;
 use std::io::Write;

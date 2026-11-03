@@ -1,4 +1,4 @@
-#![cfg(target_os = "linux")]
+mod support;
 
 use assert_cmd::Command;
 use predicates::prelude::*;
@@ -8,10 +8,8 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 const HOST: &str = "contoso.sharepoint.com";
 
 fn sharepoint(server: &MockServer, cache: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("sharepoint").unwrap();
-    cmd.env("XDG_CACHE_HOME", cache)
-        .env("XDG_CONFIG_HOME", cache)
-        .env("SHAREPOINT_BACKEND", "rest")
+    let mut cmd = support::isolated_command(cache);
+    cmd.env("SHAREPOINT_BACKEND", "rest")
         .env("SHAREPOINT_HOST", HOST)
         .env("SHAREPOINT_REST_ENDPOINT", server.uri())
         .env_remove("SHAREPOINT_COOKIE")
@@ -179,15 +177,16 @@ async fn logout_removes_session() {
 }
 
 #[tokio::test]
-async fn login_without_browser_is_input_error() {
+async fn login_with_missing_browser_is_input_error() {
     let server = MockServer::start().await;
     let dir = tempfile::tempdir().unwrap();
     sharepoint(&server, dir.path())
-        .env("PATH", dir.path())
+        .env("SHAREPOINT_BROWSER", dir.path().join("missing-browser"))
         .args(["--output", "json", "auth", "login"])
         .assert()
         .code(2)
-        .stderr(predicates::str::contains("SHAREPOINT_BROWSER"));
+        .stderr(predicates::str::contains("launch"))
+        .stderr(predicates::str::contains("missing-browser"));
 }
 
 #[tokio::test]

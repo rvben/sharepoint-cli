@@ -1,6 +1,7 @@
 //! On-disk token cache.
 //!
-//! Path: `~/.cache/sharepoint/tokens.json` (mode 0600).
+//! Stored as `sharepoint/tokens.json` in the configured cache directory
+//! (mode 0600 on Unix).
 //! Keyed by `<tenant_id>:<client_id>:<oid>` so multiple accounts coexist.
 //! Atomic writes via tempfile-and-rename so a crashed write never corrupts
 //! the file or leaks the rotated refresh token alongside the previous one.

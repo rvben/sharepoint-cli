@@ -1,4 +1,4 @@
-#![cfg(target_os = "linux")]
+mod support;
 
 use assert_cmd::Command;
 use wiremock::matchers::{header, method, path, query_param};
@@ -7,10 +7,8 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 const COOKIE: &str = "FedAuth=F; rtFa=R";
 
 fn sharepoint(server: &MockServer, cache: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("sharepoint").unwrap();
-    cmd.env("XDG_CACHE_HOME", cache)
-        .env("XDG_CONFIG_HOME", cache)
-        .env("SHAREPOINT_BACKEND", "rest")
+    let mut cmd = support::isolated_command(cache);
+    cmd.env("SHAREPOINT_BACKEND", "rest")
         .env("SHAREPOINT_HOST", "contoso.sharepoint.com")
         .env("SHAREPOINT_REST_ENDPOINT", server.uri())
         .env("SHAREPOINT_COOKIE", COOKIE)

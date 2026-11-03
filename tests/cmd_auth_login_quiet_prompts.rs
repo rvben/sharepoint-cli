@@ -57,7 +57,7 @@ async fn auth_login_quiet_still_shows_device_code_prompt_on_stderr() {
     let output = Command::cargo_bin("sharepoint")
         .unwrap()
         .env_clear()
-        // macOS resolves its cache under HOME rather than XDG_CACHE_HOME.
+        // Isolate native home paths as well as the explicit XDG overrides.
         .env("HOME", dir.path())
         .env("XDG_CONFIG_HOME", dir.path())
         .env("XDG_CACHE_HOME", dir.path())

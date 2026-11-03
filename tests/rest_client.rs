@@ -1,5 +1,3 @@
-#![cfg(target_os = "linux")]
-
 use sharepoint_cli::error::CliError;
 use sharepoint_cli::rest::RestClient;
 use wiremock::matchers::{header, method, path};

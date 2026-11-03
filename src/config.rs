@@ -1,5 +1,5 @@
-//! Configuration: profile-based TOML at `~/.config/sharepoint/config.toml`,
-//! merged with `SHAREPOINT_*` env vars and CLI flags.
+//! Configuration: profile-based TOML in the native config directory (or
+//! `XDG_CONFIG_HOME`), merged with `SHAREPOINT_*` env vars and CLI flags.
 //!
 //! There is intentionally no separate `[default]` section. Profiles live under
 //! `[profile.<name>]`; `active_profile` selects the default when no override is
@@ -152,21 +152,32 @@ pub struct ResolvedConfig {
 }
 
 pub fn config_path() -> Result<PathBuf> {
-    let base = dirs::config_dir()
+    let base = xdg_dir("XDG_CONFIG_HOME")
+        .or_else(dirs::config_dir)
         .ok_or_else(|| CliError::Other("could not determine config dir".into()))?;
     Ok(base.join("sharepoint").join("config.toml"))
 }
 
 pub fn token_cache_path() -> Result<PathBuf> {
-    let base =
-        dirs::cache_dir().ok_or_else(|| CliError::Other("could not determine cache dir".into()))?;
+    let base = xdg_dir("XDG_CACHE_HOME")
+        .or_else(dirs::cache_dir)
+        .ok_or_else(|| CliError::Other("could not determine cache dir".into()))?;
     Ok(base.join("sharepoint").join("tokens.json"))
 }
 
 pub fn session_store_path() -> Result<PathBuf> {
-    let base =
-        dirs::cache_dir().ok_or_else(|| CliError::Other("could not determine cache dir".into()))?;
+    let base = xdg_dir("XDG_CACHE_HOME")
+        .or_else(dirs::cache_dir)
+        .ok_or_else(|| CliError::Other("could not determine cache dir".into()))?;
     Ok(base.join("sharepoint").join("sessions.json"))
+}
+
+/// Honor explicit XDG overrides on every OS, retaining native defaults.
+/// Empty and relative paths are ignored, as required by the XDG convention.
+fn xdg_dir(name: &str) -> Option<PathBuf> {
+    std::env::var_os(name)
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
 }
 
 pub fn load_file(path: &Path) -> Result<ConfigFile> {
