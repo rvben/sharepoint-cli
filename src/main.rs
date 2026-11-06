@@ -160,6 +160,32 @@ fn takes_value(arg: &std::ffi::OsStr) -> bool {
         })
 }
 
+/// Condense clap's rendered error into a one-line message.
+///
+/// Clap puts the summary on the first line and lists the offending arguments
+/// (for example missing `<SITE>`) on indented lines directly below it. Those
+/// lines carry the actionable part, so they are appended to the summary. A
+/// blank line ends the detail block; tips and usage come after it.
+fn clap_error_message(rendered: &str) -> String {
+    let mut lines = rendered.lines();
+    let summary = lines
+        .next()
+        .unwrap_or("invalid arguments")
+        .trim_start_matches("error: ")
+        .trim_end();
+    let details: Vec<&str> = lines
+        .take_while(|line| line.starts_with(char::is_whitespace) && !line.trim().is_empty())
+        .map(str::trim)
+        .collect();
+    if details.is_empty() {
+        summary.to_string()
+    } else if summary.ends_with(':') {
+        format!("{summary} {}", details.join(", "))
+    } else {
+        format!("{summary}: {}", details.join(", "))
+    }
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let args = rewrite_argv(std::env::args_os());
@@ -191,14 +217,7 @@ async fn main() -> ExitCode {
                 format
             };
             let out = OutputConfig::new(format, false);
-            let msg = e.to_string();
-            let first_line = msg
-                .lines()
-                .next()
-                .unwrap_or("invalid arguments")
-                .trim_start_matches("error: ")
-                .to_string();
-            let exit = out.render_error(&CliError::Input(first_line));
+            let exit = out.render_error(&CliError::Input(clap_error_message(&e.to_string())));
             return ExitCode::from(exit as u8);
         }
     };
