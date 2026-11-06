@@ -115,8 +115,10 @@ fn recorded_responses(cli: &Path, endpoint: &str) -> Result<Vec<String>> {
         "files", "find", &library, "--query", "*", "--limit", "10", "--page", &next,
     ])?;
     ensure(
-        first["total"] == 10
-            && second["total"] == 10
+        first["items"].as_array().map(Vec::len) == Some(10)
+            && second["items"].as_array().map(Vec::len) == Some(10)
+            && first["total"].is_null()
+            && second["total"].is_null()
             && first["items"][0]["path"] == "/result-01.txt"
             && second["items"][0]["path"] == "/result-11.txt"
             && second["items"][9]["path"] == "/result-20.txt"
@@ -199,9 +201,28 @@ fn happy_path(cli: &Path, endpoint: &str) -> Result<Vec<String>> {
     let first = runner.json(&["files", "ls", &library, "--limit", "2"])?;
     let next = cursor(&first)?;
     let second = runner.json(&["files", "ls", &library, "--page", &next])?;
+    let names = |page: &Value| -> Vec<String> {
+        page["items"]
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|i| i["name"].as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let (first_names, second_names) = (names(&first), names(&second));
     ensure(
-        first["total"] == 2 && second["total"] == 2,
+        first_names.len() == 2
+            && second_names.len() == 2
+            && first_names.iter().all(|n| !second_names.contains(n))
+            && second["next"].is_null(),
         "folder cursor lost or duplicated items",
+    )?;
+    ensure(
+        first["total"] == 4 && second["total"] == 4,
+        "folder total is not the folder's item count",
     )?;
     let all = runner.json(&["files", "ls", &library, "--all"])?;
     ensure(

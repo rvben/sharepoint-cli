@@ -214,7 +214,8 @@ fn folder_api(client: &RestClient, site: &Site, server_relative: &str) -> Result
 }
 
 /// Assemble a folder's children from every REST collection page. `fetched_url`
-/// remains the folder URL so CLI cursors can resume within the combined result.
+/// remains the folder URL so CLI cursors can resume within the combined result,
+/// and the folder's full child count is known on every call.
 pub(crate) async fn list_children(
     client: &RestClient,
     site: &Site,
@@ -239,6 +240,7 @@ pub(crate) async fn list_children(
         .collect();
     items.extend(files.into_iter().map(|f| file_item(client, drive, f)));
     Ok(ListChildrenResult {
+        folder_total: Some(items.len()),
         items,
         next_url: None,
         fetched_url: folder_url,

@@ -121,6 +121,9 @@ pub(crate) struct ListChildrenResult {
     /// The URL that was actually fetched (the `page_url` argument resolved to a
     /// full URL). Used by callers that need to encode a mid-page cursor.
     pub(crate) fetched_url: String,
+    /// Number of children in the whole folder, when the backend knows it
+    /// regardless of paging.
+    pub(crate) folder_total: Option<usize>,
 }
 
 /// Fetch one page of children. `page_url` is the full Graph URL to fetch;
@@ -151,6 +154,7 @@ pub(crate) async fn list_children(
         items: page.value,
         next_url: page.next_link,
         fetched_url: absolute_url,
+        folder_total: None,
     })
 }
 

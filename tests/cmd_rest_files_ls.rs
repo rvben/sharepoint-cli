@@ -111,7 +111,9 @@ async fn ls_limit_then_page_resumes_mid_folder() {
         .stdout
         .clone();
     let v: serde_json::Value = serde_json::from_slice(&first).unwrap();
-    assert_eq!(v["total"], 2);
+    assert_eq!(v["items"].as_array().unwrap().len(), 2);
+    // REST loads the whole folder, so the total is the folder's item count.
+    assert_eq!(v["total"], 3);
     let token = v["next"].as_str().expect("next token").to_string();
     let second = sharepoint(&server, dir.path())
         .args([
@@ -129,7 +131,8 @@ async fn ls_limit_then_page_resumes_mid_folder() {
         .stdout
         .clone();
     let v2: serde_json::Value = serde_json::from_slice(&second).unwrap();
-    assert_eq!(v2["total"], 1);
+    assert_eq!(v2["items"].as_array().unwrap().len(), 1);
+    assert_eq!(v2["total"], 3);
     assert_eq!(v2["items"][0]["name"], "b.txt");
     assert!(v2["next"].is_null());
 }

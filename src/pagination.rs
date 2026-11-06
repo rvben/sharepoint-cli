@@ -16,6 +16,16 @@ pub(crate) fn record_page(seen: &mut HashSet<String>, url: &str) -> Result<()> {
     Ok(())
 }
 
+/// Size of the complete result set, when this response alone establishes it.
+///
+/// A response that started at the first item (`resumed == false`) and reached
+/// the end (`has_next == false`) holds every item, so its length is the total.
+/// Otherwise the items outside this response are uncounted and the total is
+/// unknown, which callers report as `null` rather than the page size.
+pub(crate) fn observed_total(resumed: bool, has_next: bool, returned: usize) -> Option<usize> {
+    (!resumed && !has_next).then_some(returned)
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct OffsetCursor {

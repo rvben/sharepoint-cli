@@ -230,7 +230,7 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                         ],
                         "output_fields": [
                             {"name": "items", "type": "object[]"},
-                            {"name": "total", "type": "integer"},
+                            {"name": "total", "type": "integer | null", "description": "Size of the complete result set; null when this response alone does not establish it (more pages remain, or the response resumed from --page)."},
                             {"name": "next", "type": "string | null"},
                             {"name": "source", "type": "string"}
                         ]
@@ -293,7 +293,7 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                         ],
                         "output_fields": [
                             {"name": "items", "type": "object[]"},
-                            {"name": "total", "type": "integer"},
+                            {"name": "total", "type": "integer | null", "description": "Number of items in the folder; null when unknown (Graph backend while more pages remain, or after --page)."},
                             {"name": "next", "type": "string | null"}
                         ]
                     },
@@ -344,7 +344,7 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                         ],
                         "output_fields": [
                             {"name": "items", "type": "object[]"},
-                            {"name": "total", "type": "integer"},
+                            {"name": "total", "type": "integer | null", "description": "Number of matches in the complete result set; null when this response alone does not establish it (more pages remain, or the response resumed from --page)."},
                             {"name": "next", "type": "string | null"}
                         ]
                     }

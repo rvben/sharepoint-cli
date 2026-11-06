@@ -75,7 +75,8 @@ async fn list(
     };
 
     let next_token = out_cursor.as_ref().map(encode_cursor);
-    let total = items.len();
+    let total =
+        crate::pagination::observed_total(page.is_some(), next_token.is_some(), items.len());
     if rt.out.json {
         let json_items: Vec<_> = items
             .iter()
@@ -102,7 +103,7 @@ async fn list(
                 .print_data(&format!("{:40}  {}", s.display_name, s.web_url));
         }
         rt.out
-            .print_message(&format!("({total} site(s), source={source_label})"));
+            .print_message(&format!("({} site(s), source={source_label})", items.len()));
     }
     Ok(())
 }

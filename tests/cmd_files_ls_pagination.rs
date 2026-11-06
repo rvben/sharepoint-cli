@@ -122,7 +122,12 @@ async fn files_ls_limit_mid_page_emits_cursor() {
         .clone();
 
     let v: serde_json::Value = serde_json::from_slice(&out).unwrap();
-    assert_eq!(v["total"], 2, "expected 2 items, got {}", v["total"]);
+    assert_eq!(v["items"].as_array().unwrap().len(), 2);
+    assert!(
+        v["total"].is_null(),
+        "Graph paging leaves the folder size unknown; got {}",
+        v["total"]
+    );
     assert!(
         v["next"].is_string(),
         "expected non-null next token, got {:?}",

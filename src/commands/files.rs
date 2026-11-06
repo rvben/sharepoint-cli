@@ -189,6 +189,7 @@ async fn ls(
     };
 
     let mut items: Vec<_> = Vec::new();
+    let mut folder_total = None;
 
     let mut seen = std::collections::HashSet::new();
     let out_cursor = 'outer: loop {
@@ -196,6 +197,7 @@ async fn ls(
             .list_children(&r.site, &r.drive, &r.parsed.path, current_url.as_deref())
             .await?;
         crate::pagination::record_page(&mut seen, &pageres.fetched_url)?;
+        folder_total = folder_total.or(pageres.folder_total);
 
         for (idx, it) in pageres.items.iter().enumerate() {
             if idx < skip {
@@ -220,6 +222,11 @@ async fn ls(
     };
 
     let next_token = out_cursor.as_ref().map(encode_cursor);
+    let total = folder_total.or(crate::pagination::observed_total(
+        page.is_some(),
+        next_token.is_some(),
+        items.len(),
+    ));
 
     if rt.out.json {
         let json_items: Vec<_> = items
@@ -227,7 +234,7 @@ async fn ls(
             .map(|it| filter_fields(canonical_json(it, &r.site, &r.drive, false), fields))
             .collect();
         rt.out.print_json(&serde_json::json!({
-            "total": json_items.len(),
+            "total": total,
             "next": next_token,
             "items": json_items,
         }));
@@ -434,7 +441,8 @@ async fn find(
     };
 
     let next_token = out_cursor.as_ref().map(encode_cursor);
-    let total = items.len();
+    let total =
+        crate::pagination::observed_total(page.is_some(), next_token.is_some(), items.len());
     if rt.out.json {
         let json_items: Vec<_> = items
             .iter()
@@ -449,7 +457,8 @@ async fn find(
         for it in &items {
             rt.out.print_data(&it.name);
         }
-        rt.out.print_message(&format!("({total} match(es))"));
+        rt.out
+            .print_message(&format!("({} match(es))", items.len()));
     }
     Ok(())
 }

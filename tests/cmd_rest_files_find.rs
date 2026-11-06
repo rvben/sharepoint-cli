@@ -220,6 +220,7 @@ async fn find_pages_with_startrow() {
     let dir = tempfile::tempdir().unwrap();
     let first = find(&server, dir.path(), &["--query", "txt", "--limit", "1"]);
     assert_eq!(first["items"][0]["name"], "one.txt");
+    assert!(first["total"].is_null(), "more results remain: {first}");
     let token = first["next"].as_str().expect("next token").to_string();
     let second = find(
         &server,
@@ -229,6 +230,10 @@ async fn find_pages_with_startrow() {
     assert_eq!(second["items"].as_array().unwrap().len(), 1);
     assert_eq!(second["items"][0]["name"], "two.txt");
     assert!(second["next"].is_null());
+    assert!(
+        second["total"].is_null(),
+        "a resumed response has not seen the earlier pages: {second}"
+    );
 }
 
 #[tokio::test]

@@ -134,8 +134,12 @@ positive and sets an upper bound; `sites list` can return fewer items when a
 server page ends first. Use `--all` for sites, drives, file listings,
 and search to fetch all remaining pages. `files ls --recursive` returns the
 complete tree and cannot be combined with pagination flags.
-For sites and files, `total` counts the returned items. For drives and Graph
-cached accounts, it counts the complete collection before limiting.
+`total` is the size of the complete collection, never the size of the page.
+For sites and `files find` it is known only when one response holds every
+item (no incoming `--page`, null `next`), and is `null` otherwise. For REST
+`files ls` it is always the folder's item count; for Graph `files ls` it is
+`null` while more pages remain. For drives and Graph cached accounts it counts
+the complete collection before limiting.
 `files find` searches the referenced folder and its subfolders; reference the
 library root to search the whole library. With `--name`, it keeps reading
 search pages until `--limit` matches are found or the results run out.
