@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.1](https://github.com/rvben/sharepoint-cli/compare/v0.1.0...v0.1.1) - 2026-11-06
+
+### Fixed
+
+- report total as the collection size or null, never the page size ([87c07d6](https://github.com/rvben/sharepoint-cli/commit/87c07d6ae260b0b3f292556f14aaa59368a1d7fe))
+- keep reading search pages until files find reaches --limit ([0353186](https://github.com/rvben/sharepoint-cli/commit/035318691463a3c137c7afd47300a69c27926850))
+- search only the referenced folder in files find ([2d50eb4](https://github.com/rvben/sharepoint-cli/commit/2d50eb45d71f84d8eb6a8d4f8c346ff46a8172e0))
+- name the missing argument in command-line errors ([0ddf284](https://github.com/rvben/sharepoint-cli/commit/0ddf28476b8e1a9e43d510fd383868352025f641))
+
 ## [0.1.0](https://github.com/rvben/sharepoint-cli/compare/v0.0.14...v0.1.0) - 2026-11-03
 
 ### Added
