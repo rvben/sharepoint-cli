@@ -331,10 +331,10 @@ pub fn run(command_filter: Option<&str>) -> crate::error::Result<()> {
                     },
                     {
                         "name": "find",
-                        "description": "Search for files by query and/or name glob.",
+                        "description": "Search for files by query and/or name glob within the referenced folder and its subfolders.",
                         "mutating": false,
                         "args": [
-                            {"name": "REF", "type": "string", "required": true, "description": "Drive root reference (Site:Library or spo://Site/Library)."},
+                            {"name": "REF", "type": "string", "required": true, "description": "Library or folder to search (Site:Library/folder or spo://Site/Library/folder)."},
                             {"name": "--query", "type": "string", "required": false, "description": "Full-text search query."},
                             {"name": "--name", "type": "string", "required": false, "description": "Shell glob to filter results by file name."},
                             {"name": "--limit", "type": "integer", "required": false, "default": 200, "description": "Maximum number of results."},

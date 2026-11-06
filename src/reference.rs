@@ -30,7 +30,7 @@ pub struct ParsedRef {
     pub path: String,
 }
 
-fn percent_decode(input: &str) -> String {
+pub(crate) fn percent_decode(input: &str) -> String {
     // Lightweight percent-decoder — handles `%20` etc. without pulling in another dep.
     let bytes = input.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());

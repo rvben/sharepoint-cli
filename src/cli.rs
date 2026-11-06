@@ -239,7 +239,7 @@ pub enum FilesCmd {
         #[arg(long)]
         overwrite: bool,
     },
-    /// Search inside a drive (by query and/or shell glob).
+    /// Search a library or folder, including subfolders (by query and/or shell glob).
     Find {
         #[arg(value_name = "REF")]
         reference: String,

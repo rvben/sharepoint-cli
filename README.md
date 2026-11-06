@@ -136,6 +136,8 @@ and search to fetch all remaining pages. `files ls --recursive` returns the
 complete tree and cannot be combined with pagination flags.
 For sites and files, `total` counts the returned items. For drives and Graph
 cached accounts, it counts the complete collection before limiting.
+`files find` searches the referenced folder and its subfolders; reference the
+library root to search the whole library.
 Graph `auth status` supports `--limit` and `--page`; REST status describes a
 single host session and rejects `--page`.
 

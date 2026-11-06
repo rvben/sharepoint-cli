@@ -1,32 +1,49 @@
 //! Library-scoped search via the SharePoint search REST API (KQL).
 
+use super::drives::server_relative;
 use super::{RestClient, SEARCH_ROW_LIMIT, percent_encode_keep_slash, quoted, search_page};
 use crate::error::Result;
 use crate::graph::drives::{Drive, DriveItem, File, ParentReference};
 use crate::graph::search::SearchResult;
 
-pub(crate) fn build_url(client: &RestClient, drive: &Drive, query: &str) -> String {
-    let library_url = client.public_url(drive.root_folder.as_deref().unwrap_or(""));
-    // Parenthesise the user query so an `OR` inside it cannot escape the library scope.
-    let kql = format!("({query}) path:\"{library_url}\" IsDocument:1");
-    client.root_api(&format!(
+/// First-page search URL for `query` under `folder` (library-relative).
+pub(crate) fn build_url(
+    client: &RestClient,
+    drive: &Drive,
+    folder: &str,
+    query: &str,
+) -> Result<String> {
+    let scope_url = client.public_url(&server_relative(drive, folder)?);
+    // Parenthesise the user query so an `OR` inside it cannot escape the folder scope.
+    let kql = format!("({query}) path:\"{scope_url}\" IsDocument:1");
+    Ok(client.root_api(&format!(
         "/_api/search/query?querytext={}&selectproperties=%27Title,Path,FileName,Size,LastModifiedTime,UniqueId%27&rowlimit={SEARCH_ROW_LIMIT}&startrow=0",
         percent_encode_keep_slash(&quoted(&kql))
-    ))
+    )))
 }
 
 pub(crate) async fn search(
     client: &RestClient,
     drive: &Drive,
+    folder: &str,
     query: &str,
     page_url: Option<&str>,
 ) -> Result<SearchResult> {
-    let url = page_url.map_or_else(|| build_url(client, drive, query), str::to_owned);
+    let url = match page_url {
+        Some(u) => u.to_owned(),
+        None => build_url(client, drive, folder, query)?,
+    };
     let page = search_page(client, &url).await?;
     let library_prefix = format!(
         "{}/",
         client.public_url(drive.root_folder.as_deref().unwrap_or(""))
     );
+    // KQL `path:` is a URL prefix match, so `/Projects` also matches
+    // `/Projects 2024`; only rows below `<folder>/` are in scope.
+    let folder_prefix = match folder.trim_matches('/') {
+        "" => String::new(),
+        f => format!("{f}/"),
+    };
     let items = page
         .rows
         .into_iter()
@@ -38,6 +55,7 @@ pub(crate) async fn search(
                 .unwrap_or_else(|| full.rsplit('/').next().unwrap_or_default().to_string());
             // Drop rows outside the library rather than emit a garbled path.
             let in_lib = strip_prefix_ignore_case(&full, &library_prefix)?;
+            strip_prefix_ignore_case(in_lib, &folder_prefix)?;
             let parent = in_lib
                 .rsplit_once('/')
                 .map(|(p, _)| format!("/{p}"))
@@ -103,7 +121,7 @@ mod tests {
             drive_type: "documentLibrary".into(),
             root_folder: Some("/sites/M/Shared Documents".into()),
         };
-        let u = build_url(&c, &d, "budget");
+        let u = build_url(&c, &d, "", "budget").unwrap();
         assert!(
             u.starts_with("http://127.0.0.1:1/_api/search/query?querytext=%27%28budget%29%20path%3A%22https%3A//contoso.sharepoint.com/sites/M/Shared%20Documents%22"),
             "{u}"

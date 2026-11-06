@@ -226,3 +226,52 @@ async fn find_pages_with_startrow() {
     assert_eq!(second["items"][0]["name"], "two.txt");
     assert!(second["next"].is_null());
 }
+
+#[tokio::test]
+async fn find_is_scoped_to_the_referenced_folder() {
+    let server = MockServer::start().await;
+    mount_web(&server).await;
+    mount_lists(&server).await;
+    let expected = format!("'(*) path:\"{LIBRARY_URL}/Projects\" IsDocument:1'");
+    // KQL `path:` is a URL prefix match, so the service also returns the
+    // sibling folder `Projects 2024`; those rows must not be reported.
+    Mock::given(method("GET"))
+        .and(path("/_api/search/query"))
+        .and(query_param("querytext", expected.as_str()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(search_body(
+            3,
+            &[
+                ("plan.docx", &format!("{LIBRARY_URL}/Projects/plan.docx")),
+                ("deep.txt", &format!("{LIBRARY_URL}/projects/Sub/deep.txt")),
+                ("old.docx", &format!("{LIBRARY_URL}/Projects 2024/old.docx")),
+            ],
+        )))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let dir = tempfile::tempdir().unwrap();
+    let out = sharepoint(&server, dir.path())
+        .args([
+            "--output",
+            "json",
+            "files",
+            "find",
+            &format!("{LIBRARY_REF}/Projects/"),
+            "--name",
+            "*",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let v: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let paths: Vec<_> = v["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["path"].as_str().unwrap())
+        .collect();
+    assert_eq!(paths, ["/Projects/plan.docx", "/projects/Sub/deep.txt"]);
+    assert_eq!(v["total"], 2);
+}

@@ -136,12 +136,13 @@ impl Backend {
     pub(crate) async fn search(
         &self,
         drive: &Drive,
+        folder: &str,
         query: &str,
         page_url: Option<&str>,
     ) -> Result<SearchResult> {
         match self {
-            Backend::Graph(g) => graph::search::search(g, &drive.id, query, page_url).await,
-            Backend::Rest(r) => rest::search::search(r, drive, query, page_url).await,
+            Backend::Graph(g) => graph::search::search(g, &drive.id, folder, query, page_url).await,
+            Backend::Rest(r) => rest::search::search(r, drive, folder, query, page_url).await,
         }
     }
 }

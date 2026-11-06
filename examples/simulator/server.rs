@@ -542,10 +542,13 @@ impl Api {
             for site in &self.fixtures.sites {
                 for library in &site.libraries {
                     let root = library.root_path(site);
-                    if format!("https://{}{root}", site.host) != scope {
-                        continue;
-                    }
                     for file in &library.files {
+                        // KQL `path:` is a case-insensitive URL prefix match, so a
+                        // folder scope also matches siblings sharing its prefix.
+                        let url = format!("https://{}{root}/{}", site.host, file.path);
+                        if !url.to_lowercase().starts_with(&scope.to_lowercase()) {
+                            continue;
+                        }
                         if matches_text(&file.path, &text) || matches_text(&file.content, &text) {
                             rows.push(cells(&[
                                 ("FileName", name(&file.path).into()),

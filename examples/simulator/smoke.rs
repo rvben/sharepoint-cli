@@ -247,6 +247,17 @@ fn happy_path(cli: &Path, endpoint: &str) -> Result<Vec<String>> {
         filtered["total"] == 1 && filtered["items"][0]["name"] == "O'Brien #1 %.txt",
         "quoted search query differs",
     )?;
+    let plans = runner.json(&[
+        "files",
+        "find",
+        &format!("{library}/Plans"),
+        "--query",
+        "txt",
+    ])?;
+    ensure(
+        plans["total"] == 1 && plans["items"][0]["path"] == "/Plans/Q4 plan.txt",
+        "folder search is not scoped to the folder",
+    )?;
     checks.push("library search, scope, and pagination".into());
 
     let file = format!("{library}/O%27Brien%20%231%20%25.txt");

@@ -3,9 +3,10 @@
 //! The `find` command uses this and adds client-side glob filtering on top
 //! when `--name <glob>` is given.
 
-use super::drives::DriveItem;
+use super::drives::{DriveItem, encode_path_segments};
 use super::{GraphClient, PagedResponse};
 use crate::error::Result;
+use crate::reference::percent_decode;
 
 pub(crate) struct SearchResult {
     pub(crate) items: Vec<DriveItem>,
@@ -16,39 +17,73 @@ pub(crate) struct SearchResult {
     pub(crate) fetched_url: String,
 }
 
-/// Execute a drive search. `page_url` is the full Graph URL to fetch;
-/// when `None` the default search URL is constructed from `drive_id` and `query`.
+/// Execute a search scoped to `folder` (library-relative, `""` or `/` for the
+/// whole drive). `page_url` is the full Graph URL to fetch; when `None` the
+/// first-page search URL is built from `drive_id`, `folder` and `query`.
 pub(crate) async fn search(
     graph: &GraphClient,
     drive_id: &str,
+    folder: &str,
     query: &str,
     page_url: Option<&str>,
 ) -> Result<SearchResult> {
     let api = match page_url {
         Some(url) => url.to_string(),
-        None => build_search_url(&format!("drives/{drive_id}"), query),
+        None => build_search_url(drive_id, folder, query),
     };
     // Resolve to a full absolute URL so the cursor stored in `fetched_url`
     // is always a complete URL (required by the host-validation check on decode).
     let absolute_url = graph.url(&api).await;
     let page: PagedResponse<DriveItem> = graph.get_json(&absolute_url).await?;
+    let items = page
+        .value
+        .into_iter()
+        .filter(|item| !known_outside(item, folder))
+        .collect();
     Ok(SearchResult {
-        items: page.value,
+        items,
         next_url: page.next_link,
         fetched_url: absolute_url,
     })
 }
 
-/// Build the Graph API path for a drive search request.
+/// Whether `item`'s parent path proves it lies outside `folder`.
 ///
-/// The `drive_path` is a bare path prefix such as `"drives/{id}"`.
+/// The search request is already scoped to the folder; this check guards
+/// against the service widening that scope. Items whose `parentReference`
+/// carries no path cannot be placed, so they are left to the server's scope.
+fn known_outside(item: &DriveItem, folder: &str) -> bool {
+    let folder = folder.trim_matches('/');
+    if folder.is_empty() {
+        return false;
+    }
+    let Some((_, parent)) = item
+        .parent_reference
+        .as_ref()
+        .and_then(|p| p.path.split_once(':'))
+    else {
+        return false;
+    };
+    let parent = percent_decode(parent.trim_matches('/')).to_ascii_lowercase();
+    let folder = folder.to_ascii_lowercase();
+    !(parent == folder || parent.starts_with(&format!("{folder}/")))
+}
+
+/// Build the Graph API path for a search under `folder` of drive `drive_id`.
+///
 /// OData single-quote escaping is applied first (doubling `'` to `''`),
 /// then the result is percent-encoded so reserved URL characters like
 /// `&`, `#`, `=`, and space are never interpolated raw into the URL.
-pub(super) fn build_search_url(drive_path: &str, query: &str) -> String {
+pub(super) fn build_search_url(drive_id: &str, folder: &str, query: &str) -> String {
     let odata_escaped = query.replace('\'', "''");
     let encoded = url_encode_query(&odata_escaped);
-    format!("/{drive_path}/root/search(q='{encoded}')")
+    let folder = folder.trim_matches('/');
+    let item = if folder.is_empty() {
+        "root".to_string()
+    } else {
+        format!("root:/{}:", encode_path_segments(folder))
+    };
+    format!("/drives/{drive_id}/{item}/search(q='{encoded}')")
 }
 
 /// Percent-encode a string using the RFC 3986 unreserved character set,
@@ -124,7 +159,7 @@ mod tests {
 
     #[test]
     fn build_search_url_percent_encodes_reserved_characters() {
-        let url = build_search_url("drives/D1", "foo & bar=baz#frag");
+        let url = build_search_url("D1", "", "foo & bar=baz#frag");
         // Reserved characters must be percent-encoded.
         assert!(
             !url.contains(" & "),
@@ -140,7 +175,7 @@ mod tests {
 
     #[test]
     fn build_search_url_odata_escapes_single_quotes() {
-        let url = build_search_url("drives/D1", "Bob's");
+        let url = build_search_url("D1", "", "Bob's");
         // OData: single quote doubled, then the doubled single quote is percent-encoded.
         // ' becomes '' in OData, and '' becomes %27%27 in URL encoding.
         assert!(
@@ -151,7 +186,7 @@ mod tests {
 
     #[test]
     fn build_search_url_plain_alphanumeric_is_unchanged() {
-        let url = build_search_url("drives/D1", "quarterly-report_2025.xlsx");
+        let url = build_search_url("D1", "", "quarterly-report_2025.xlsx");
         assert!(
             url.contains("quarterly-report_2025.xlsx"),
             "unreserved chars must not be encoded; got {url}"

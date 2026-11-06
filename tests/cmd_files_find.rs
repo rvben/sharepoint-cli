@@ -162,3 +162,69 @@ async fn files_find_filters_by_glob() {
         .stdout(predicates::str::contains("notes.txt").not())
         .stdout(predicates::str::contains("slides.pptx").not());
 }
+
+fn graph_find(server: &MockServer, dir: &std::path::Path, extra: &[&str]) -> serde_json::Value {
+    let mut args = vec!["--output", "json", "files", "find"];
+    args.extend_from_slice(extra);
+    let out = support::isolated_command(dir)
+        .env("XDG_CACHE_HOME", dir)
+        .env("SHAREPOINT_TENANT_ID", "contoso")
+        .env("SHAREPOINT_CLIENT_ID", "client-1")
+        .env("SHAREPOINT_ACCESS_TOKEN", "FAKE")
+        .env("MICROSOFT_GRAPH_ENDPOINT", server.uri())
+        .args(&args)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    serde_json::from_slice(&out).unwrap()
+}
+
+#[tokio::test]
+async fn files_find_searches_the_referenced_folder() {
+    let server = MockServer::start().await;
+    baseline_mocks(&server).await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/drives/D1/root:/Projects/Q4%20Plans:/search(q='%2A')",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "value": [
+                {"id": "F1", "name": "in.docx", "file": {},
+                 "parentReference": {"path": "/drives/D1/root:/Projects/Q4 Plans"}},
+                {"id": "F2", "name": "deep.docx", "file": {},
+                 "parentReference": {"path": "/drives/D1/root:/projects/Q4%20Plans/Sub"}},
+                {"id": "F3", "name": "sibling.docx", "file": {},
+                 "parentReference": {"path": "/drives/D1/root:/Projects/Q4 Plans 2024"}},
+                {"id": "F4", "name": "root.docx", "file": {},
+                 "parentReference": {"path": "/drives/D1/root:"}},
+                {"id": "F5", "name": "unplaced.docx", "file": {},
+                 "parentReference": {"driveId": "D1"}}
+            ]
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let dir = tempfile::tempdir().unwrap();
+    seed_cache(dir.path());
+    let v = graph_find(
+        &server,
+        dir.path(),
+        &[
+            "https://contoso.sharepoint.com/sites/Marketing/Documents/Projects/Q4%20Plans/",
+            "--name",
+            "*",
+        ],
+    );
+    let names: Vec<_> = v["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["name"].as_str().unwrap())
+        .collect();
+    // Results the service places outside the folder are dropped; a result
+    // without a parent path stays within the server-side scope.
+    assert_eq!(names, ["in.docx", "deep.docx", "unplaced.docx"]);
+    assert_eq!(v["total"], 3);
+}

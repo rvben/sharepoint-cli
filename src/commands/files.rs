@@ -398,7 +398,9 @@ async fn find(
 
     let mut seen = std::collections::HashSet::new();
     let out_cursor = 'outer: loop {
-        let res = backend.search(&r.drive, q, current_url.as_deref()).await?;
+        let res = backend
+            .search(&r.drive, &r.parsed.path, q, current_url.as_deref())
+            .await?;
         crate::pagination::record_page(&mut seen, &res.fetched_url)?;
 
         for (idx, it) in res.items.iter().enumerate() {
