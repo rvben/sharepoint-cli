@@ -228,3 +228,41 @@ async fn files_find_searches_the_referenced_folder() {
     assert_eq!(names, ["in.docx", "deep.docx", "unplaced.docx"]);
     assert_eq!(v["total"], 3);
 }
+
+#[tokio::test]
+async fn files_find_name_follows_pages_until_a_match() {
+    let server = MockServer::start().await;
+    baseline_mocks(&server).await;
+    let next = format!("{}/drives/D1/root/search-page-2", server.uri());
+    Mock::given(method("GET"))
+        .and(path("/drives/D1/root/search(q='%2A')"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "value": [{"id": "F1", "name": "notes.txt", "file": {}}],
+            "@odata.nextLink": next,
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/drives/D1/root/search-page-2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "value": [{"id": "F2", "name": "report.pdf", "file": {}}]
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let dir = tempfile::tempdir().unwrap();
+    seed_cache(dir.path());
+    let v = graph_find(
+        &server,
+        dir.path(),
+        &[
+            "https://contoso.sharepoint.com/sites/Marketing/Documents",
+            "--name",
+            "*.pdf",
+        ],
+    );
+    assert_eq!(v["items"][0]["name"], "report.pdf");
+    assert_eq!(v["items"].as_array().unwrap().len(), 1);
+    assert!(v["next"].is_null());
+    assert_eq!(v["total"], 1);
+}

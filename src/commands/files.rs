@@ -425,16 +425,11 @@ async fn find(
         }
         skip = 0;
 
-        if all {
-            match res.next_url {
-                Some(url) => current_url = Some(url),
-                None => break None,
-            }
-        } else {
-            break res.next_url.map(|url| crate::graph::Cursor {
-                next: Some(url),
-                skip: 0,
-            });
+        // Keep reading until `limit` matches are collected: a page can hold
+        // no matches for `--name` while later pages do.
+        match res.next_url {
+            Some(url) => current_url = Some(url),
+            None => break None,
         }
     };
 

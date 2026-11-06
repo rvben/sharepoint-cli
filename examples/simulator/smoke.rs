@@ -109,9 +109,11 @@ fn recorded_responses(cli: &Path, endpoint: &str) -> Result<Vec<String>> {
     )?;
     checks.push("PnP recordings: folder metadata after file 404".into());
 
-    let first = runner.json(&["files", "find", &library, "--query", "*"])?;
+    let first = runner.json(&["files", "find", &library, "--query", "*", "--limit", "10"])?;
     let next = cursor(&first)?;
-    let second = runner.json(&["files", "find", &library, "--query", "*", "--page", &next])?;
+    let second = runner.json(&[
+        "files", "find", &library, "--query", "*", "--limit", "10", "--page", &next,
+    ])?;
     ensure(
         first["total"] == 10
             && second["total"] == 10
@@ -231,9 +233,11 @@ fn happy_path(cli: &Path, endpoint: &str) -> Result<Vec<String>> {
     )?;
     checks.push("folder listing, cursors, empty folders, and recursion".into());
 
-    let first = runner.json(&["files", "find", &library, "--query", "txt"])?;
+    let first = runner.json(&["files", "find", &library, "--query", "txt", "--limit", "1"])?;
     let next = cursor(&first)?;
-    let second = runner.json(&["files", "find", &library, "--query", "txt", "--page", &next])?;
+    let second = runner.json(&[
+        "files", "find", &library, "--query", "txt", "--limit", "1", "--page", &next,
+    ])?;
     ensure(
         first["items"][0]["path"] != second["items"][0]["path"],
         "search cursor repeated the first page",

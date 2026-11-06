@@ -130,14 +130,15 @@ input error instead.
 
 List responses contain `items`, `total`, and an opaque `next` cursor. Pass a
 non-null cursor back with `--page`; stop when `next` is null. `--limit` must be
-positive and sets an upper bound, so a server page or a search filtered by
-`--name` can return fewer items. Use `--all` for sites, drives, file listings,
+positive and sets an upper bound; `sites list` can return fewer items when a
+server page ends first. Use `--all` for sites, drives, file listings,
 and search to fetch all remaining pages. `files ls --recursive` returns the
 complete tree and cannot be combined with pagination flags.
 For sites and files, `total` counts the returned items. For drives and Graph
 cached accounts, it counts the complete collection before limiting.
 `files find` searches the referenced folder and its subfolders; reference the
-library root to search the whole library.
+library root to search the whole library. With `--name`, it keeps reading
+search pages until `--limit` matches are found or the results run out.
 Graph `auth status` supports `--limit` and `--page`; REST status describes a
 single host session and rejects `--page`.
 

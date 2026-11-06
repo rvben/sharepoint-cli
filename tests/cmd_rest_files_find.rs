@@ -218,13 +218,57 @@ async fn find_pages_with_startrow() {
         .mount(&server)
         .await;
     let dir = tempfile::tempdir().unwrap();
-    let first = find(&server, dir.path(), &["--query", "txt"]);
+    let first = find(&server, dir.path(), &["--query", "txt", "--limit", "1"]);
     assert_eq!(first["items"][0]["name"], "one.txt");
     let token = first["next"].as_str().expect("next token").to_string();
-    let second = find(&server, dir.path(), &["--query", "txt", "--page", &token]);
-    assert_eq!(second["total"], 1);
+    let second = find(
+        &server,
+        dir.path(),
+        &["--query", "txt", "--limit", "1", "--page", &token],
+    );
+    assert_eq!(second["items"].as_array().unwrap().len(), 1);
     assert_eq!(second["items"][0]["name"], "two.txt");
     assert!(second["next"].is_null());
+}
+
+#[tokio::test]
+async fn find_name_reads_past_pages_without_matches() {
+    let server = MockServer::start().await;
+    mount_web(&server).await;
+    mount_lists(&server).await;
+    Mock::given(method("GET"))
+        .and(path("/_api/search/query"))
+        .and(query_param("startrow", "0"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(search_body(
+            3,
+            &[
+                ("a.txt", &format!("{LIBRARY_URL}/a.txt")),
+                ("b.txt", &format!("{LIBRARY_URL}/b.txt")),
+            ],
+        )))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/_api/search/query"))
+        .and(query_param("startrow", "2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(search_body(
+            3,
+            &[("report.pdf", &format!("{LIBRARY_URL}/report.pdf"))],
+        )))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let dir = tempfile::tempdir().unwrap();
+    let v = find(&server, dir.path(), &["--name", "*.pdf"]);
+    let names: Vec<_> = v["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["report.pdf"]);
+    assert!(v["next"].is_null());
+    assert_eq!(v["total"], 1);
 }
 
 #[tokio::test]
